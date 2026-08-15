@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_URL || "https://api-gateway.salmondune-b6d2a6eb.centralindia.azurecontainerapps.io/api";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const p = await params;

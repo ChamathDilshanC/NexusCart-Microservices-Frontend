@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🛒 NexusCart Frontend
 
-## Getting Started
+Welcome to the **NexusCart Frontend** repository! This is the modern, responsive, and high-performance client application for the NexusCart e-commerce platform.
 
-First, run the development server:
+Built with **Next.js**, **Tailwind CSS**, and **TypeScript**, this frontend delivers a seamless shopping and merchant experience with lightning-fast performance and an elegant, glassmorphic UI.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 🎨 Tech Stack
+
+- **Framework:** [Next.js 16](https://nextjs.org/) (App Router & Turbopack)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+- **Language:** [TypeScript](https://www.typescriptlang.org/)
+- **State Management:** React Hooks & Context API
+- **Icons:** Custom SVG Components
+
+---
+
+## 🏗️ Architecture & Data Flow
+
+The frontend acts as the primary interface for both end-customers and merchants. It communicates exclusively with the **Azure API Gateway**, which then routes requests to the appropriate backend microservices.
+
+```mermaid
+graph TD
+    Client[Browser / Client] -->|HTTP / HTTPS| Next[Next.js App Router]
+    Next -->|API Routes Proxy| Gateway[Azure API Gateway]
+    
+    subgraph Azure Container Apps
+    Gateway --> Auth[Auth Service]
+    Gateway --> Biz[Business Service]
+    Gateway --> Prod[Product Service]
+    end
+    
+    Auth -.-> DB[(Cosmos DB)]
+    Biz -.-> DB
+    Prod -.-> DB
+
+    classDef next fill:#000,stroke:#333,stroke-width:2px,color:#fff;
+    classDef azure fill:#0072c6,stroke:#005a9e,stroke-width:2px,color:#fff;
+    classDef db fill:#004f3f,stroke:#003a2f,stroke-width:2px,color:#fff;
+    
+    class Next next;
+    class Gateway,Auth,Biz,Prod azure;
+    class DB db;
 ```
 
+---
+
+## 🚀 Getting Started
+
+Follow these instructions to run the frontend locally.
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Environment Configuration
+Copy the example environment file to your local setup:
+```bash
+cp .env.example .env.local
+```
+Inside `.env.local`, ensure the `NEXT_PUBLIC_BACKEND_URL` is pointing to the correct backend environment (either your local API Gateway or the Azure deployment).
+
+### 3. Run the Development Server
+```bash
+npm run dev
+```
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📁 Directory Structure
 
-## Learn More
+```text
+src/
+├── app/                  # Next.js App Router pages and layouts
+│   ├── api/              # API Route Handlers (Proxies to Backend)
+│   ├── globals.css       # Global Tailwind and custom CSS styles
+│   ├── layout.tsx        # Root layout wrapper
+│   └── page.tsx          # Main landing page
+└── components/           # Reusable React components
+    ├── AuthModal.tsx     # Authentication and Registration UI
+    ├── Header.tsx        # Navigation bar
+    ├── Hero.tsx          # Landing page hero section
+    └── Icons.tsx         # SVG Icon library
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 💡 Key Features
+- **OTP Verification Flow:** Secure, seamless email-based sign-ups.
+- **Glassmorphic UI:** Premium design aesthetics.
+- **API Proxying:** Protects backend architecture by proxying requests through Next.js serverless functions.
+- **Responsive Layout:** Works beautifully on desktop, tablet, and mobile.
