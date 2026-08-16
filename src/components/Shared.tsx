@@ -27,6 +27,7 @@ interface AppStateContextType {
   setAuthView: (v: 'login' | 'signup' | 'otp' | 'forgot_password' | 'reset_password') => void;
   currentUser: User | null;
   setCurrentUser: (u: User | null) => void;
+  isAuthInitialized: boolean;
 }
 
 const AppStateContext = createContext<AppStateContextType>({
@@ -42,6 +43,7 @@ const AppStateContext = createContext<AppStateContextType>({
   setAuthView: () => {},
   currentUser: null,
   setCurrentUser: () => {},
+  isAuthInitialized: false,
 });
 
 export const useAppState = () => useContext(AppStateContext);
@@ -53,6 +55,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'signup' | 'otp' | 'forgot_password' | 'reset_password'>('login');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthInitialized, setIsAuthInitialized] = useState(false);
 
   // Read token from localStorage on mount
   React.useEffect(() => {
@@ -62,6 +65,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         setCurrentUser(JSON.parse(userStr));
       } catch (e) {}
     }
+    setIsAuthInitialized(true);
   }, []);
 
   return (
@@ -71,7 +75,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       isMenuOpen, setIsMenuOpen,
       isAuthModalOpen, setIsAuthModalOpen,
       authView, setAuthView,
-      currentUser, setCurrentUser
+      currentUser, setCurrentUser,
+      isAuthInitialized
     }}>
       {children}
     </AppStateContext.Provider>

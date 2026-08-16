@@ -6,13 +6,15 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
 export default function AdminBusinesses() {
-  const { currentUser } = useAppState();
+  const { currentUser, isAuthInitialized } = useAppState();
   const router = useRouter();
   
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAuthInitialized) return;
+
     // Only Admin can access
     if (!currentUser || currentUser.role !== "Admin") {
       router.push("/");
@@ -20,7 +22,7 @@ export default function AdminBusinesses() {
     }
 
     fetchPendingBusinesses();
-  }, [currentUser, router]);
+  }, [currentUser, isAuthInitialized, router]);
 
   const fetchPendingBusinesses = async () => {
     setLoading(true);
@@ -64,7 +66,7 @@ export default function AdminBusinesses() {
     }
   };
 
-  if (loading) {
+  if (!isAuthInitialized || loading) {
     return <div className="min-h-screen pt-[100px] flex justify-center"><p>Loading...</p></div>;
   }
 

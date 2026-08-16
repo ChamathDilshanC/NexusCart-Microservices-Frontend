@@ -7,7 +7,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 
 export default function VendorDashboard() {
-  const { currentUser } = useAppState();
+  const { currentUser, isAuthInitialized } = useAppState();
   const router = useRouter();
   
   const [business, setBusiness] = useState<any>(null);
@@ -15,6 +15,8 @@ export default function VendorDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAuthInitialized) return;
+
     if (!currentUser || currentUser.role !== "Vendor") {
       router.push("/");
       return;
@@ -55,9 +57,9 @@ export default function VendorDashboard() {
     };
 
     fetchDashboardData();
-  }, [currentUser, router]);
+  }, [currentUser, isAuthInitialized, router]);
 
-  if (loading) {
+  if (!isAuthInitialized || loading) {
     return <div className="min-h-screen pt-[100px] flex justify-center"><p>Loading dashboard...</p></div>;
   }
 

@@ -212,11 +212,16 @@ export function AuthModal() {
 
                   {authView === 'login' && (
                     <form onSubmit={handleLogin} className="flex flex-col gap-[1rem] flex-1">
-                      <div className="flex justify-center mb-2">
+                      <div className="flex justify-center mb-2 w-full">
                         <GoogleLogin
                           onSuccess={handleGoogleSuccess}
                           onError={() => setError("Google login failed.")}
                           useOneTap
+                          width="400"
+                          theme="outline"
+                          shape="pill"
+                          text="continue_with"
+                          logo_alignment="center"
                         />
                       </div>
                       
@@ -250,11 +255,15 @@ export function AuthModal() {
 
                   {authView === 'signup' && (
                     <form onSubmit={handleSignup} className="flex flex-col gap-[1rem] flex-1">
-                      <div className="flex justify-center mb-2">
+                      <div className="flex justify-center mb-2 w-full">
                         <GoogleLogin
                           onSuccess={handleGoogleSuccess}
                           onError={() => setError("Google signup failed.")}
-                          text="signup_with"
+                          text="continue_with"
+                          width="400"
+                          theme="outline"
+                          shape="pill"
+                          logo_alignment="center"
                         />
                       </div>
 

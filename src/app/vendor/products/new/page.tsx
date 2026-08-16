@@ -7,7 +7,7 @@ import { useAppState, PillButton } from "../../../../components/Shared";
 import Link from "next/link";
 
 export default function NewProduct() {
-  const { currentUser } = useAppState();
+  const { currentUser, isAuthInitialized } = useAppState();
   const router = useRouter();
   
   const [formData, setFormData] = useState({
@@ -24,10 +24,11 @@ export default function NewProduct() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    if (!isAuthInitialized) return;
     if (!currentUser || currentUser.role !== "Vendor") {
       router.push("/");
     }
-  }, [currentUser, router]);
+  }, [currentUser, isAuthInitialized, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +71,7 @@ export default function NewProduct() {
     }
   };
 
-  if (!currentUser) return null;
+  if (!isAuthInitialized || !currentUser) return null;
 
   return (
     <div className="min-h-screen bg-[var(--color-surface)] pt-[120px] pb-[60px] px-[20px] flex justify-center">
