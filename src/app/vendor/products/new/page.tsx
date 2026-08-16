@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAppState, PillButton } from "../../../../components/Shared";
+import { LiquidRevealCanvas } from "../../../../components/Hero";
 import Link from "next/link";
+import { ArrowLeft, Check, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function NewProduct() {
-  const { currentUser, isAuthInitialized } = useAppState();
+  const { currentUser, isAuthInitialized, ready } = useAppState();
   const router = useRouter();
   
   const [formData, setFormData] = useState({
@@ -62,7 +64,7 @@ export default function NewProduct() {
       setSuccess(true);
       setTimeout(() => {
         router.push("/vendor/dashboard");
-      }, 1500);
+      }, 2000);
       
     } catch (err: any) {
       setError(err.message);
@@ -74,132 +76,162 @@ export default function NewProduct() {
   if (!isAuthInitialized || !currentUser) return null;
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface)] pt-[120px] pb-[60px] px-[20px] flex justify-center">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl bg-[#fff] p-[40px] rounded-[24px] border border-[var(--color-line)] shadow-sm"
-      >
-        
-        <div className="flex items-center gap-[16px] mb-[32px]">
-          <Link href="/vendor/dashboard" className="text-[rgba(17,17,17,0.5)] hover:text-[#111] transition-colors">
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-          </Link>
-          <div>
-            <h1 className="text-[32px] font-semibold tracking-tight text-[#111]">Add Product</h1>
-            <p className="text-[16px] text-[rgba(17,17,17,0.6)] mt-[4px]">List a new item in your store</p>
-          </div>
-        </div>
+    <section className="relative isolate min-h-screen overflow-hidden bg-[#111]">
+      <LiquidRevealCanvas />
+      
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-[rgba(17,17,17,0.5)] via-[rgba(17,17,17,0.8)] to-[rgba(17,17,17,0.95)]" />
 
-        {success ? (
-          <div className="bg-[#e6f4ea] text-[#137333] p-[24px] rounded-[16px] text-center">
-            <div className="inline-flex items-center justify-center w-[48px] h-[48px] rounded-full bg-[#ceead6] mb-[16px]">
-              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <div className="shell relative z-20 flex min-h-screen items-center justify-center px-[1.25rem] py-[8rem] sm:px-[2rem]">
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={ready ? { opacity: 1, y: 0, scale: 1 } : {}}
+          transition={{ type: "spring", stiffness: 200, damping: 24, delay: 0.3 }}
+          className="w-full max-w-2xl rounded-[24px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] p-[2rem] shadow-2xl backdrop-blur-2xl sm:p-[3rem]"
+        >
+          <div className="mb-[2rem] flex items-center gap-[1rem]">
+            <Link 
+              href="/vendor/dashboard" 
+              className="grid h-[2.5rem] w-[2.5rem] place-items-center rounded-full border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.7)] transition-all hover:bg-[rgba(255,255,255,0.1)] hover:text-[#fff]"
+            >
+              <ArrowLeft className="h-[1.25rem] w-[1.25rem]" />
+            </Link>
+            <div>
+              <h1 className="text-[1.75rem] font-semibold tracking-tight text-[#fff] sm:text-[2rem]">Add Product</h1>
+              <p className="mt-[0.25rem] text-[0.875rem] text-[rgba(255,255,255,0.5)]">List a new item in your store</p>
             </div>
-            <h3 className="font-semibold text-[20px]">Product Created!</h3>
-            <p className="mt-[8px] text-[15px]">Taking you back to the dashboard...</p>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-[24px]">
-            {error && (
-              <div className="bg-[#fce8e6] text-[#c5221f] p-[16px] rounded-[12px] text-[14px] flex items-start gap-[12px]">
-                <svg className="shrink-0 mt-[2px]" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                {error}
-              </div>
-            )}
-            
-            <div className="flex flex-col gap-[8px]">
-              <label className="text-[14px] font-medium text-[#111]">Product Name</label>
-              <input 
-                type="text" 
-                required
-                value={formData.name}
-                onChange={e => setFormData({...formData, name: e.target.value})}
-                className="w-full rounded-[12px] border border-[var(--color-line)] px-[16px] py-[12px] text-[16px] outline-none transition-colors focus:border-[var(--color-ink)]"
-                placeholder="e.g. Wireless Noise-Cancelling Headphones"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-[24px]">
-              <div className="flex flex-col gap-[8px]">
-                <label className="text-[14px] font-medium text-[#111]">Price ($)</label>
-                <input 
-                  type="number" 
-                  step="0.01"
-                  min="0"
-                  required
-                  value={formData.price}
-                  onChange={e => setFormData({...formData, price: e.target.value})}
-                  className="w-full rounded-[12px] border border-[var(--color-line)] px-[16px] py-[12px] text-[16px] outline-none transition-colors focus:border-[var(--color-ink)]"
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="flex flex-col gap-[8px]">
-                <label className="text-[14px] font-medium text-[#111]">Stock Quantity</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  required
-                  value={formData.stock}
-                  onChange={e => setFormData({...formData, stock: e.target.value})}
-                  className="w-full rounded-[12px] border border-[var(--color-line)] px-[16px] py-[12px] text-[16px] outline-none transition-colors focus:border-[var(--color-ink)]"
-                  placeholder="e.g. 50"
-                />
-              </div>
-            </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <label className="text-[14px] font-medium text-[#111]">Category</label>
-              <select 
-                required
-                value={formData.category}
-                onChange={e => setFormData({...formData, category: e.target.value})}
-                className="w-full rounded-[12px] border border-[var(--color-line)] px-[16px] py-[12px] text-[16px] outline-none transition-colors focus:border-[var(--color-ink)] bg-white"
+          <AnimatePresence mode="wait">
+            {success ? (
+              <motion.div 
+                key="success"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center justify-center gap-[1rem] rounded-[16px] border border-[rgba(74,222,128,0.2)] bg-[rgba(74,222,128,0.05)] p-[3rem] text-center"
               >
-                <option value="" disabled>Select a category</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Clothing">Clothing</option>
-                <option value="Home & Garden">Home & Garden</option>
-                <option value="Sports">Sports</option>
-                <option value="Books">Books</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+                <div className="grid h-[64px] w-[64px] place-items-center rounded-full bg-[rgba(74,222,128,0.1)] text-[#4ade80]">
+                  <Check className="h-[32px] w-[32px]" />
+                </div>
+                <div>
+                  <h3 className="text-[1.5rem] font-semibold text-[#4ade80]">Product Created!</h3>
+                  <p className="mt-[0.5rem] text-[rgba(255,255,255,0.6)]">Taking you back to the dashboard...</p>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.form 
+                key="form"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, filter: "blur(10px)" }}
+                onSubmit={handleSubmit} 
+                className="flex flex-col gap-[1.5rem]"
+              >
+                {error && (
+                  <div className="flex items-start gap-[0.75rem] rounded-[12px] border border-[rgba(248,113,113,0.2)] bg-[rgba(248,113,113,0.05)] p-[1rem] text-[0.875rem] text-[#f87171]">
+                    <AlertTriangle className="mt-[0.125rem] h-[1.25rem] w-[1.25rem] shrink-0" />
+                    {error}
+                  </div>
+                )}
+                
+                <div className="flex flex-col gap-[0.5rem]">
+                  <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Product Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
+                    placeholder="e.g. Wireless Noise-Cancelling Headphones"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 gap-[1.5rem] md:grid-cols-2">
+                  <div className="flex flex-col gap-[0.5rem]">
+                    <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Price ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      required
+                      value={formData.price}
+                      onChange={e => setFormData({...formData, price: e.target.value})}
+                      className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-[0.5rem]">
+                    <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Stock Quantity</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      required
+                      value={formData.stock}
+                      onChange={e => setFormData({...formData, stock: e.target.value})}
+                      className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
+                      placeholder="e.g. 50"
+                    />
+                  </div>
+                </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <label className="text-[14px] font-medium text-[#111]">Image URL</label>
-              <input 
-                type="url" 
-                value={formData.imageUrl}
-                onChange={e => setFormData({...formData, imageUrl: e.target.value})}
-                className="w-full rounded-[12px] border border-[var(--color-line)] px-[16px] py-[12px] text-[16px] outline-none transition-colors focus:border-[var(--color-ink)]"
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-[8px]">
-              <label className="text-[14px] font-medium text-[#111]">Description</label>
-              <textarea 
-                required
-                rows={4}
-                value={formData.description}
-                onChange={e => setFormData({...formData, description: e.target.value})}
-                className="w-full rounded-[12px] border border-[var(--color-line)] px-[16px] py-[12px] text-[16px] outline-none transition-colors focus:border-[var(--color-ink)] resize-none"
-                placeholder="Describe your product in detail..."
-              />
-            </div>
-            
-            <div className="mt-[8px] pt-[24px] border-t border-[var(--color-line)] flex justify-end gap-[16px]">
-              <Link href="/vendor/dashboard">
-                <PillButton variant="ghost" className="!text-[15px]">Cancel</PillButton>
-              </Link>
-              <PillButton type="submit" variant="dark" className="!text-[15px]" disabled={loading}>
-                {loading ? "Creating..." : "Create Product"}
-              </PillButton>
-            </div>
-          </form>
-        )}
-      </motion.div>
-    </div>
+                <div className="flex flex-col gap-[0.5rem]">
+                  <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Category</label>
+                  <select 
+                    required
+                    value={formData.category}
+                    onChange={e => setFormData({...formData, category: e.target.value})}
+                    className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)] [&>option]:bg-[#111] [&>option]:text-[#fff]"
+                  >
+                    <option value="" disabled className="text-[rgba(255,255,255,0.3)]">Select a category</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="Clothing">Clothing</option>
+                    <option value="Home & Garden">Home & Garden</option>
+                    <option value="Sports">Sports</option>
+                    <option value="Books">Books</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-[0.5rem]">
+                  <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Image URL</label>
+                  <input 
+                    type="url" 
+                    value={formData.imageUrl}
+                    onChange={e => setFormData({...formData, imageUrl: e.target.value})}
+                    className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+                
+                <div className="flex flex-col gap-[0.5rem]">
+                  <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Description</label>
+                  <textarea 
+                    required
+                    rows={4}
+                    value={formData.description}
+                    onChange={e => setFormData({...formData, description: e.target.value})}
+                    className="w-full resize-none rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
+                    placeholder="Describe your product in detail..."
+                  />
+                </div>
+                
+                <div className="mt-[1rem] flex items-center justify-end gap-[1rem] border-t border-[rgba(255,255,255,0.1)] pt-[1.5rem]">
+                  <Link href="/vendor/dashboard" className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.5)] transition-colors hover:text-[#fff]">
+                    Cancel
+                  </Link>
+                  <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="flex items-center gap-[0.5rem] rounded-[9999px] bg-[#fff] px-[1.5rem] py-[0.75rem] text-[0.875rem] font-medium text-[#111] transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:hover:scale-100"
+                  >
+                    {loading && <Loader2 className="h-[1rem] w-[1rem] animate-spin" />}
+                    {loading ? "Creating..." : "Create Product"}
+                  </button>
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+    </section>
   );
 }
