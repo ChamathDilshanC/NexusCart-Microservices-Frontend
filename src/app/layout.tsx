@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   openGraph: {
     images: [
       {
-        url: "/Logo/Logo with Text.png",
+        url: "/Logo/Logo with out Text.png",
         width: 1200,
         height: 630,
         alt: "NexusCart Logo",
