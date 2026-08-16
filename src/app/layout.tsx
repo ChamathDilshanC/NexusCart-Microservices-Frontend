@@ -14,10 +14,6 @@ const onest = Onest({
 export const metadata: Metadata = {
   title: "NexusCart — Enterprise E-commerce Platform",
   description: "NexusCart is a highly scalable, microservices-based e-commerce platform built for modern businesses.",
-  icons: {
-    icon: "/Logo/Logo with out Text.png",
-    apple: "/Logo/Logo with out Text.png",
-  },
   openGraph: {
     images: [
       {
