@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { PageLoader } from "@/components/PageLoader";
 import { Header, NavMenu } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { Footer } from "@/components/Sections";

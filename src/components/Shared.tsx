@@ -49,7 +49,7 @@ const AppStateContext = createContext<AppStateContextType>({
 export const useAppState = () => useContext(AppStateContext);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
