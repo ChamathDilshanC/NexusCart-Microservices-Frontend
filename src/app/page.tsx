@@ -22,7 +22,6 @@ export default function Home() {
         Skip to content
       </a>
 
-      <PageLoader />
       <Header />
       {isAdmin ? null : <NavMenu />}
       
