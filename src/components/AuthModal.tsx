@@ -19,11 +19,7 @@ export function AuthModal() {
   const [role, setRole] = useState<"Customer" | "Vendor">("Customer");
   const [otp, setOtp] = useState("");
   
-  // Business Registration States
-  const [businessName, setBusinessName] = useState("");
-  const [address, setAddress] = useState("");
-  const [registrationNumber, setRegistrationNumber] = useState("");
-  const [contactNumber, setContactNumber] = useState("");
+  // Business Registration States (Removed, moved to dedicated page)
 
   useEffect(() => {
     if (isAuthModalOpen) {
@@ -84,11 +80,9 @@ export function AuthModal() {
       setCurrentUser(data.user);
       
       setTimeout(() => {
+        setIsAuthModalOpen(false);
         if (data.user.role === "Vendor") {
-          // You could check if business exists here, but let's assume they want to register
-          setAuthView("business_register");
-        } else {
-          setIsAuthModalOpen(false);
+          window.location.href = "/vendor/dashboard";
         }
       }, 1000);
     }
@@ -110,13 +104,7 @@ export function AuthModal() {
     }
   };
 
-  const handleBusinessRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const data = await apiCall("business/register", { businessName, address, registrationNumber, contactNumber });
-    if (data) {
-      setTimeout(() => setIsAuthModalOpen(false), 1000);
-    }
-  };
+
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +153,7 @@ export function AuthModal() {
             </button>
 
             <AnimatePresence mode="wait">
-              {status === "success" && authView !== "business_register" && authView !== "login" && authView !== "otp" ? (
+              {status === "success" && authView !== "login" && authView !== "otp" ? (
                 <motion.div key="success" {...slideVariants} className="flex flex-col items-center justify-center gap-[1rem] py-[4rem] text-center m-auto">
                   <div className="grid h-[3.5rem] w-[3.5rem] place-items-center rounded-[9999px] bg-[var(--color-ink)] text-[1.5rem] text-[var(--color-accent-from)]">
                     <LogoMark className="h-[1.5em] w-[1.5em]" />
@@ -180,7 +168,6 @@ export function AuthModal() {
                       {authView === 'login' && "Welcome back"}
                       {authView === 'signup' && "Create an account"}
                       {authView === 'otp' && "Verify your email"}
-                      {authView === 'business_register' && "Vendor Onboarding"}
                       {authView === 'forgot_password' && "Reset your password"}
                       {authView === 'reset_password' && "Check your email"}
                     </div>
@@ -188,7 +175,6 @@ export function AuthModal() {
                       {authView === 'login' && "Sign in to NexusCart."}
                       {authView === 'signup' && "Join the platform."}
                       {authView === 'otp' && "Enter your 6-digit code."}
-                      {authView === 'business_register' && "Register your business."}
                       {authView === 'forgot_password' && "Forgot your password?"}
                       {authView === 'reset_password' && "Create new password."}
                     </h2>
@@ -325,35 +311,7 @@ export function AuthModal() {
                     </form>
                   )}
 
-                  {authView === 'business_register' && (
-                    <form onSubmit={handleBusinessRegister} className="flex flex-col gap-[1rem] flex-1">
-                      <div className="flex gap-[1rem]">
-                        <label className="flex flex-col gap-[0.5rem] flex-1">
-                          <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Business Name</span>
-                          <input type="text" required value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Acme Corp" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
-                        </label>
-                        <label className="flex flex-col gap-[0.5rem] flex-1">
-                          <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Reg Number</span>
-                          <input type="text" required value={registrationNumber} onChange={e => setRegistrationNumber(e.target.value)} placeholder="REG-12345" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
-                        </label>
-                      </div>
-                      <label className="flex flex-col gap-[0.5rem]">
-                        <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Address</span>
-                        <input type="text" required value={address} onChange={e => setAddress(e.target.value)} placeholder="123 Commerce St" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
-                      </label>
-                      <label className="flex flex-col gap-[0.5rem]">
-                        <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Contact Number</span>
-                        <input type="text" required value={contactNumber} onChange={e => setContactNumber(e.target.value)} placeholder="+1 234 567 8900" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
-                      </label>
-                      
-                      <div className="mt-auto pt-[1rem] flex items-center justify-between gap-[1rem]">
-                        <span className="text-[0.75rem] text-[rgba(17,17,17,0.45)]">Skip for now? <button type="button" onClick={() => setIsAuthModalOpen(false)} className="underline hover:text-[#111]">Close</button></span>
-                        <PillButton variant="dark" withArrow arrow="right" type="submit" disabled={status === "loading"}>
-                          {status === "loading" ? "Submitting…" : (status === "success" ? "Submitted" : "Complete Registration")}
-                        </PillButton>
-                      </div>
-                    </form>
-                  )}
+
                 </motion.div>
               )}
             </AnimatePresence>

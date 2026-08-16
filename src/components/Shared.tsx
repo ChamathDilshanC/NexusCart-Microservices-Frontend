@@ -23,8 +23,8 @@ interface AppStateContextType {
   setIsMenuOpen: (v: boolean) => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (v: boolean) => void;
-  authView: 'login' | 'signup' | 'otp' | 'business_register' | 'forgot_password' | 'reset_password';
-  setAuthView: (v: 'login' | 'signup' | 'otp' | 'business_register' | 'forgot_password' | 'reset_password') => void;
+  authView: 'login' | 'signup' | 'otp' | 'forgot_password' | 'reset_password';
+  setAuthView: (v: 'login' | 'signup' | 'otp' | 'forgot_password' | 'reset_password') => void;
   currentUser: User | null;
   setCurrentUser: (u: User | null) => void;
 }
@@ -51,7 +51,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authView, setAuthView] = useState<'login' | 'signup' | 'otp' | 'business_register' | 'forgot_password' | 'reset_password'>('login');
+  const [authView, setAuthView] = useState<'login' | 'signup' | 'otp' | 'forgot_password' | 'reset_password'>('login');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Read token from localStorage on mount
