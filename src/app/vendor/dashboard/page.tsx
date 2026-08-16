@@ -26,7 +26,7 @@ export default function VendorDashboard() {
       try {
         const token = localStorage.getItem("nexus_token");
         // Fetch Business Profile
-        const res = await fetch("/api/business/me", {
+        const res = await fetch("/api/business/my-business", {
           headers: { "Authorization": `Bearer ${token}` }
         });
 
