@@ -103,7 +103,18 @@ export function AuthModal() {
     e.preventDefault();
     const data = await apiCall("verify-otp", { email, otp });
     if (data) {
-      setTimeout(() => setAuthView("login"), 1000);
+      // User is now created on verify — auto-login
+      if (data.token) {
+        localStorage.setItem("nexus_token", data.token);
+        localStorage.setItem("nexus_user", JSON.stringify(data.user));
+        setCurrentUser(data.user);
+      }
+      setTimeout(() => {
+        setIsAuthModalOpen(false);
+        if (data.user?.role === "Vendor") {
+          window.location.href = "/vendor/dashboard";
+        }
+      }, 1000);
     }
   };
 
