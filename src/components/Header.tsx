@@ -114,6 +114,8 @@ export function Header() {
                     onClick={() => {
                       setCurrentUser(null);
                       localStorage.removeItem('nexus_user');
+                      localStorage.removeItem('nexus_token');
+                      window.location.href = '/';
                     }}
                     className="rounded-[0.875rem] bg-[rgba(241,240,238,0.6)] px-[0.75rem] py-[0.5rem] text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)] transition-colors hover:bg-[rgba(17,17,17,0.1)]"
                   >

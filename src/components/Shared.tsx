@@ -9,7 +9,7 @@ import { twMerge } from "tailwind-merge";
 export interface User {
   id: string;
   email: string;
-  role: 'Customer' | 'Vendor';
+  role: 'Customer' | 'Vendor' | 'Admin';
   name: string;
 }
 
