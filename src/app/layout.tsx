@@ -3,6 +3,7 @@ import { Onest } from "next/font/google";
 import "./globals.css";
 import { ScrollProvider } from "@/components/ScrollProvider";
 import { AppStateProvider } from "@/components/Shared";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const onest = Onest({
   variable: "--font-sans",
@@ -30,8 +31,6 @@ export const viewport = {
   themeColor: "#0a0a0a",
 };
 
-import { GoeyToaster } from 'goey-toast';
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -46,7 +45,7 @@ export default function RootLayout({
         <ScrollProvider>
           <AppStateProvider>
             {children}
-            <GoeyToaster />
+            <ToastProvider />
           </AppStateProvider>
         </ScrollProvider>
       </body>
