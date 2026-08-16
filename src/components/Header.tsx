@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LogoMark, Grid, X } from "./Icons";
 import { useAppState, cn, PillButton } from "./Shared";
+import { Search, Store } from "lucide-react";
 
 function useClock() {
   const [time, setTime] = useState("9:41am");
@@ -74,39 +75,63 @@ export function Header() {
                 { label: "Platform", id: "platform" },
                 { label: "Services", id: "services", dropdown: true },
                 { label: "About", id: "about" },
-                { label: "Careers", id: "careers" },
+                { label: "Stores", href: "/search" },
                 { label: "Contact", modal: true }
               ].map((item, i) => (
                 <li key={i}>
-                  <button 
-                    onClick={() => item.modal ? setIsModalOpen(true) : scrollTo(item.id as string)}
-                    className="group outline-none flex items-center gap-1"
-                    aria-current={item.label === "Home" ? "page" : undefined}
-                  >
-                    <motion.span
-                      whileHover="hover"
-                      variants={{ hover: { y: -2, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 22 } } }}
-                      className="opacity-80 transition-opacity"
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      className="group outline-none flex items-center gap-1"
                     >
-                      {item.label}
-                    </motion.span>
-                    {item.dropdown && <span className="text-[0.75rem] opacity-60">▾</span>}
-                  </button>
+                      <motion.span
+                        whileHover="hover"
+                        variants={{ hover: { y: -2, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 22 } } }}
+                        className="opacity-80 transition-opacity"
+                      >
+                        {item.label}
+                      </motion.span>
+                    </a>
+                  ) : (
+                    <button 
+                      onClick={() => item.modal ? setIsModalOpen(true) : scrollTo(item.id as string)}
+                      className="group outline-none flex items-center gap-1"
+                      aria-current={item.label === "Home" ? "page" : undefined}
+                    >
+                      <motion.span
+                        whileHover="hover"
+                        variants={{ hover: { y: -2, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 22 } } }}
+                        className="opacity-80 transition-opacity"
+                      >
+                        {item.label}
+                      </motion.span>
+                      {item.dropdown && <span className="text-[0.75rem] opacity-60">▾</span>}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
 
             {/* Right */}
             <div className="flex items-center gap-[0.75rem]">
-              <div className="hidden md:flex items-center gap-[0.75rem] rounded-[0.875rem] border border-[rgba(230,229,226,0.8)] bg-[rgba(255,255,255,0.4)] px-[0.75rem] py-[0.5rem] text-[0.75rem] text-[rgba(17,17,17,0.7)] backdrop-blur-[4px]">
-                <span className="text-[rgba(17,17,17,0.45)]">Local time</span>
-                <span className="min-w-[3.5rem] font-medium tabular-nums text-[#111]">{time}</span>
-                <span className="text-[rgba(17,17,17,0.3)]">•</span>
-                <span className="font-medium">{dateStr}</span>
-              </div>
+              <a
+                href="/search"
+                className="hidden md:flex items-center gap-[0.5rem] rounded-[0.875rem] border border-[rgba(230,229,226,0.8)] bg-[rgba(255,255,255,0.4)] px-[0.75rem] py-[0.5rem] text-[0.75rem] text-[rgba(17,17,17,0.5)] backdrop-blur-[4px] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Search stores...</span>
+              </a>
 
               {currentUser ? (
                 <div className="hidden lg:flex items-center gap-[0.75rem]">
+                  {currentUser.role === "Vendor" && (
+                    <a
+                      href="/vendor/dashboard"
+                      className="rounded-[0.875rem] bg-[rgba(241,240,238,0.6)] px-[0.75rem] py-[0.5rem] text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)] transition-colors hover:bg-[rgba(17,17,17,0.1)]"
+                    >
+                      Dashboard
+                    </a>
+                  )}
                   <div className="text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)]">
                     {currentUser.name} ({currentUser.role})
                   </div>
@@ -167,10 +192,12 @@ export function NavMenu() {
     return () => window.removeEventListener("keydown", handleEsc);
   }, [isMenuOpen, setIsMenuOpen]);
 
-  const handleLink = (target: "modal" | string) => {
+  const handleLink = (target: "modal" | string, href?: string) => {
     setIsMenuOpen(false);
-    if (target === "modal") {
-      setTimeout(() => setIsModalOpen(true), 300); // slight delay to let menu close
+    if (href) {
+      setTimeout(() => { window.location.href = href; }, 300);
+    } else if (target === "modal") {
+      setTimeout(() => setIsModalOpen(true), 300);
     } else {
       setTimeout(() => {
         const el = document.getElementById(target);
@@ -184,7 +211,7 @@ export function NavMenu() {
     { label: "Platform", id: "platform" },
     { label: "Services", id: "services" },
     { label: "About", id: "about" },
-    { label: "Careers", id: "careers" },
+    { label: "Stores", href: "/search" },
     { label: "Contact", modal: true }
   ];
 
@@ -222,7 +249,7 @@ export function NavMenu() {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: "1rem", opacity: 0 }}
                     transition={{ delay: (i * 45 + 80) / 1000, duration: 0.5, ease: "easeOut" }}
-                    onClick={() => handleLink(item.modal ? "modal" : item.id as string)}
+                    onClick={() => handleLink(item.modal ? "modal" : (item.id || ""), item.href)}
                     className="group flex w-full items-center gap-[1rem] py-[0.5rem] text-left text-[2.25rem] font-semibold tracking-[-.02em] sm:text-[3.75rem]"
                   >
                     <span className="text-[1rem] font-normal text-[rgba(255,255,255,0.3)] transition-colors group-hover:text-[var(--color-accent-from)]">

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { LiquidRevealCanvas } from "../../../components/Hero";
-import { Clock, Plus, Package, DollarSign, ShoppingCart, Info, AlertTriangle } from "lucide-react";
+import { Clock, Plus, Package, DollarSign, ShoppingCart, Info, AlertTriangle, Palette, ExternalLink } from "lucide-react";
 
 export default function VendorDashboard() {
   const { currentUser, isAuthInitialized, ready } = useAppState();
@@ -142,6 +142,30 @@ export default function VendorDashboard() {
 
           {business.status === "Approved" && (
             <div className="flex flex-col gap-[2rem]">
+              {/* Storefront Action */}
+              <div className="flex flex-col sm:flex-row gap-[1rem]">
+                <Link href="/vendor/storefront" className="flex items-center gap-[0.75rem] rounded-[24px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] p-[1.25rem] flex-1 hover:bg-[rgba(255,255,255,0.05)] transition-colors">
+                  <div className="grid h-[48px] w-[48px] place-items-center rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
+                    <Palette className="h-[24px] w-[24px]" />
+                  </div>
+                  <div>
+                    <h3 className="text-[0.9375rem] font-semibold text-[#fff]">Customize Storefront</h3>
+                    <p className="text-[0.75rem] text-[rgba(255,255,255,0.4)] mt-[0.25rem]">Design your store poster & branding</p>
+                  </div>
+                </Link>
+                {business.slug && (
+                  <Link href={`/store/${business.slug}`} target="_blank" className="flex items-center gap-[0.75rem] rounded-[24px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] p-[1.25rem] flex-1 hover:bg-[rgba(255,255,255,0.05)] transition-colors">
+                    <div className="grid h-[48px] w-[48px] place-items-center rounded-full bg-[rgba(74,222,128,0.1)] text-[#4ade80]">
+                      <ExternalLink className="h-[24px] w-[24px]" />
+                    </div>
+                    <div>
+                      <h3 className="text-[0.9375rem] font-semibold text-[#fff]">View Live Store</h3>
+                      <p className="text-[0.75rem] text-[rgba(255,255,255,0.4)] mt-[0.25rem]">/store/{business.slug}</p>
+                    </div>
+                  </Link>
+                )}
+              </div>
+
               {/* Stats Row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-[1.5rem]">
                 <div className="bg-[rgba(255,255,255,0.03)] p-[1.5rem] rounded-[24px] border border-[rgba(255,255,255,0.1)] shadow-2xl backdrop-blur-2xl flex items-center justify-between">

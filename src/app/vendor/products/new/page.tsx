@@ -18,7 +18,9 @@ export default function NewProduct() {
     price: "",
     stock: "",
     category: "",
-    imageUrl: ""
+    imageUrl: "",
+    images: "",
+    isFeatured: false
   });
   
   const [loading, setLoading] = useState(false);
@@ -41,9 +43,14 @@ export default function NewProduct() {
       const token = localStorage.getItem("nexus_token");
       
       const payload = {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
         price: Number(formData.price),
-        stock: Number(formData.stock)
+        stock: Number(formData.stock),
+        category: formData.category,
+        imageUrl: formData.imageUrl,
+        images: formData.images.split(",").map((s: string) => s.trim()).filter(Boolean),
+        isFeatured: formData.isFeatured
       };
 
       const res = await fetch("/api/products", {
@@ -175,30 +182,48 @@ export default function NewProduct() {
 
                 <div className="flex flex-col gap-[0.5rem]">
                   <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Category</label>
-                  <select 
+                  <input
+                    type="text"
                     required
                     value={formData.category}
                     onChange={e => setFormData({...formData, category: e.target.value})}
-                    className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)] [&>option]:bg-[#111] [&>option]:text-[#fff]"
-                  >
-                    <option value="" disabled className="text-[rgba(255,255,255,0.3)]">Select a category</option>
-                    <option value="Electronics">Electronics</option>
-                    <option value="Clothing">Clothing</option>
-                    <option value="Home & Garden">Home & Garden</option>
-                    <option value="Sports">Sports</option>
-                    <option value="Books">Books</option>
-                    <option value="Other">Other</option>
-                  </select>
+                    className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
+                    placeholder="e.g. Laptops, Monitors, Keyboards"
+                  />
+                </div>
+
+                <div className="flex items-center gap-[0.75rem]">
+                  <input
+                    type="checkbox"
+                    id="isFeatured"
+                    checked={formData.isFeatured}
+                    onChange={e => setFormData({...formData, isFeatured: e.target.checked})}
+                    className="h-[1.25rem] w-[1.25rem] rounded-[6px] accent-white"
+                  />
+                  <label htmlFor="isFeatured" className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)] cursor-pointer">
+                    Mark as Featured Product
+                  </label>
                 </div>
 
                 <div className="flex flex-col gap-[0.5rem]">
-                  <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Image URL</label>
+                  <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Main Image URL</label>
                   <input 
                     type="url" 
                     value={formData.imageUrl}
                     onChange={e => setFormData({...formData, imageUrl: e.target.value})}
                     className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
                     placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-[0.5rem]">
+                  <label className="text-[0.875rem] font-medium text-[rgba(255,255,255,0.7)]">Additional Images (comma-separated URLs)</label>
+                  <input 
+                    type="text" 
+                    value={formData.images}
+                    onChange={e => setFormData({...formData, images: e.target.value})}
+                    className="w-full rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] px-[1rem] py-[0.875rem] text-[0.9375rem] text-[#fff] outline-none transition-all placeholder:text-[rgba(255,255,255,0.3)] focus:border-[rgba(255,255,255,0.3)] focus:bg-[rgba(255,255,255,0.08)]"
+                    placeholder="https://img1.jpg, https://img2.jpg"
                   />
                 </div>
                 
