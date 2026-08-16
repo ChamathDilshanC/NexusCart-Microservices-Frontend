@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useScroll } from "./ScrollProvider";
 import { useAppState, cn, PillButton } from "./Shared";
 import { X, LogoMark } from "./Icons";
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID";
 
 export function AuthModal() {
   const { isAuthModalOpen, setIsAuthModalOpen, authView, setAuthView, setCurrentUser } = useAppState();
@@ -104,6 +107,26 @@ export function AuthModal() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    const data = await apiCall("google", { 
+      credential: credentialResponse.credential,
+      role: role // only used if signup, but google Auth handles both
+    });
+    
+    if (data) {
+      localStorage.setItem("nexus_token", data.token);
+      localStorage.setItem("nexus_user", JSON.stringify(data.user));
+      setCurrentUser(data.user);
+      
+      setTimeout(() => {
+        setIsAuthModalOpen(false);
+        if (data.user.role === "Vendor") {
+          window.location.href = "/vendor/dashboard";
+        }
+      }, 1000);
+    }
+  };
+
 
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -129,10 +152,11 @@ export function AuthModal() {
   };
 
   return (
-    <AnimatePresence>
-      {isAuthModalOpen && (
-        <div 
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-[rgba(17,17,17,0.3)] p-[1rem] backdrop-blur-[16px] sm:items-center"
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AnimatePresence>
+        {isAuthModalOpen && (
+          <div 
+            className="fixed inset-0 z-[110] flex items-end justify-center bg-[rgba(17,17,17,0.3)] p-[1rem] backdrop-blur-[16px] sm:items-center"
           role="dialog"
           aria-modal="true"
           onClick={() => setIsAuthModalOpen(false)}
@@ -188,6 +212,20 @@ export function AuthModal() {
 
                   {authView === 'login' && (
                     <form onSubmit={handleLogin} className="flex flex-col gap-[1rem] flex-1">
+                      <div className="flex justify-center mb-2">
+                        <GoogleLogin
+                          onSuccess={handleGoogleSuccess}
+                          onError={() => setError("Google login failed.")}
+                          useOneTap
+                        />
+                      </div>
+                      
+                      <div className="relative flex items-center py-2">
+                        <div className="flex-grow border-t border-[var(--color-line)]"></div>
+                        <span className="flex-shrink-0 mx-4 text-[rgba(17,17,17,0.4)] text-[0.75rem] uppercase tracking-wider font-medium">Or</span>
+                        <div className="flex-grow border-t border-[var(--color-line)]"></div>
+                      </div>
+
                       <label className="flex flex-col gap-[0.5rem]">
                         <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Email</span>
                         <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
@@ -212,6 +250,20 @@ export function AuthModal() {
 
                   {authView === 'signup' && (
                     <form onSubmit={handleSignup} className="flex flex-col gap-[1rem] flex-1">
+                      <div className="flex justify-center mb-2">
+                        <GoogleLogin
+                          onSuccess={handleGoogleSuccess}
+                          onError={() => setError("Google signup failed.")}
+                          text="signup_with"
+                        />
+                      </div>
+
+                      <div className="relative flex items-center py-2">
+                        <div className="flex-grow border-t border-[var(--color-line)]"></div>
+                        <span className="flex-shrink-0 mx-4 text-[rgba(17,17,17,0.4)] text-[0.75rem] uppercase tracking-wider font-medium">Or sign up with email</span>
+                        <div className="flex-grow border-t border-[var(--color-line)]"></div>
+                      </div>
+
                       <div className="flex gap-[1rem]">
                         <label className="flex flex-col gap-[0.5rem] flex-1">
                           <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Name</span>
@@ -318,6 +370,7 @@ export function AuthModal() {
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+      </AnimatePresence>
+    </GoogleOAuthProvider>
   );
 }
