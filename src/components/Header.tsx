@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LogoMark, Grid, X } from "./Icons";
 import { useAppState, cn, PillButton } from "./Shared";
-import { Search, Store } from "lucide-react";
+import { Search } from "lucide-react";
 
 function useClock() {
   const [time, setTime] = useState("9:41am");
@@ -75,7 +75,7 @@ export function Header() {
                 { label: "Platform", id: "platform" },
                 { label: "Services", id: "services", dropdown: true },
                 { label: "About", id: "about" },
-                { label: "Stores", href: "/search" },
+                { label: "Shop", href: "/shop" },
                 { label: "Contact", modal: true }
               ].map((item, i) => (
                 <li key={i}>
@@ -115,21 +115,21 @@ export function Header() {
             {/* Right */}
             <div className="flex items-center gap-[0.75rem]">
               <a
-                href="/search"
+                href="/shop"
                 className="hidden md:flex items-center gap-[0.5rem] rounded-[0.875rem] border border-[rgba(230,229,226,0.8)] bg-[rgba(255,255,255,0.4)] px-[0.75rem] py-[0.5rem] text-[0.75rem] text-[rgba(17,17,17,0.5)] backdrop-blur-[4px] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
               >
                 <Search className="w-3.5 h-3.5" />
-                <span>Search stores...</span>
+                <span>Search products...</span>
               </a>
 
               {currentUser ? (
                 <div className="hidden lg:flex items-center gap-[0.75rem]">
-                  {currentUser.role === "Vendor" && (
+                  {currentUser.role === "Admin" && (
                     <a
-                      href="/vendor/dashboard"
+                      href="/admin"
                       className="rounded-[0.875rem] bg-[rgba(241,240,238,0.6)] px-[0.75rem] py-[0.5rem] text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)] transition-colors hover:bg-[rgba(17,17,17,0.1)]"
                     >
-                      Dashboard
+                      Admin
                     </a>
                   )}
                   <div className="text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)]">
@@ -211,7 +211,7 @@ export function NavMenu() {
     { label: "Platform", id: "platform" },
     { label: "Services", id: "services" },
     { label: "About", id: "about" },
-    { label: "Stores", href: "/search" },
+    { label: "Shop", href: "/shop" },
     { label: "Contact", modal: true }
   ];
 

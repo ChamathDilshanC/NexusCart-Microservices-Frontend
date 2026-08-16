@@ -187,9 +187,9 @@ export function LiquidRevealCanvas() {
 
 function CarouselCard() {
   const items = [
-    { caption: "E-commerce Platform", title: "Built to scale." },
-    { caption: "Storefront Design", title: "Crafted to convert." },
-    { caption: "Brand systems", title: "Designed to last." },
+    { caption: "Premium Quality", title: "Curated products." },
+    { caption: "Free Shipping", title: "On orders over $50." },
+    { caption: "Easy Returns", title: "30-day guarantee." },
   ];
   const [idx, setIdx] = useState(0);
 
@@ -262,12 +262,12 @@ function CarouselCard() {
 }
 
 export function Hero() {
-  const { ready, setIsAuthModalOpen, setAuthView } = useAppState();
+  const { ready } = useAppState();
 
   const easeOutCubic = [0.215, 0.61, 0.355, 1] as const;
 
-  const titleLines = ["Bold ideas,", "shipped with", "quiet precision"];
-  const partners = ["Kaido", "Northpeak", "Vellum", "Orbit", "Brightline", "Cobalt", "Mesa"];
+  const titleLines = ["Shop smarter,", "live better"];
+  const partners = ["Electronics", "Fashion", "Home", "Sports", "Beauty", "Books", "Toys"];
 
   return (
     <section id="home" className="relative isolate overflow-hidden rounded-b-[2rem] bg-[var(--color-hero-to)]">
@@ -324,7 +324,7 @@ export function Hero() {
               {[...Array(5)].map((_, i) => <Star key={i} className="h-[1em] w-[1em]" />)}
             </span>
             <span className="text-[0.875rem] font-medium text-[rgba(17,17,17,0.7)]">
-              200+ brands shipped
+              200+ happy customers
             </span>
           </motion.div>
 
@@ -334,17 +334,11 @@ export function Hero() {
             transition={{ delay: 0.75, duration: 0.6 }}
             className="flex flex-wrap gap-[0.75rem]"
           >
-            <PillButton variant="dark" withArrow arrow="right" onClick={() => {
-              setAuthView('signup');
-              setIsAuthModalOpen(true);
-            }}>
-              Get Started
+            <PillButton variant="dark" withArrow arrow="right" href="/shop">
+              Shop Now
             </PillButton>
-            <PillButton variant="outline" onClick={() => {
-              const el = document.getElementById("platform");
-              if (el) el.scrollIntoView({ behavior: "smooth" });
-            }}>
-              View Work
+            <PillButton variant="outline" href="/shop?sort=newest">
+              New Arrivals
             </PillButton>
           </motion.div>
         </div>

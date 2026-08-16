@@ -19,7 +19,7 @@ export function AuthModal() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<"Customer" | "Vendor">("Customer");
+  const [role] = useState<"Customer">("Customer");
   const [otp, setOtp] = useState("");
   
   // Business Registration States (Removed, moved to dedicated page)
@@ -84,8 +84,8 @@ export function AuthModal() {
       
       setTimeout(() => {
         setIsAuthModalOpen(false);
-        if (data.user.role === "Vendor") {
-          window.location.href = "/vendor/dashboard";
+        if (data.user.role === "Admin") {
+          window.location.href = "/admin";
         }
       }, 1000);
     }
@@ -111,8 +111,8 @@ export function AuthModal() {
       }
       setTimeout(() => {
         setIsAuthModalOpen(false);
-        if (data.user?.role === "Vendor") {
-          window.location.href = "/vendor/dashboard";
+        if (data.user?.role === "Admin") {
+          window.location.href = "/admin";
         }
       }, 1000);
     }
@@ -131,8 +131,8 @@ export function AuthModal() {
       
       setTimeout(() => {
         setIsAuthModalOpen(false);
-        if (data.user.role === "Vendor") {
-          window.location.href = "/vendor/dashboard";
+        if (data.user.role === "Admin") {
+          window.location.href = "/admin";
         }
       }, 1000);
     }
@@ -284,19 +284,10 @@ export function AuthModal() {
                         <div className="flex-grow border-t border-[var(--color-line)]"></div>
                       </div>
 
-                      <div className="flex gap-[1rem]">
-                        <label className="flex flex-col gap-[0.5rem] flex-1">
-                          <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Name</span>
-                          <input type="text" required value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
-                        </label>
-                        <label className="flex flex-col gap-[0.5rem] flex-1">
-                          <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Account Type</span>
-                          <select value={role} onChange={e => setRole(e.target.value as "Customer" | "Vendor")} className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.875rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff] appearance-none cursor-pointer">
-                            <option value="Customer">Customer</option>
-                            <option value="Vendor">Vendor</option>
-                          </select>
-                        </label>
-                      </div>
+                      <label className="flex flex-col gap-[0.5rem] flex-1">
+                        <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Name</span>
+                        <input type="text" required value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
+                      </label>
                       <label className="flex flex-col gap-[0.5rem]">
                         <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Email</span>
                         <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
