@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAppState, PillButton } from "./Shared";
 import { LiquidRevealCanvas } from "./Hero";
 import { Check, X, Building2, MapPin, Phone, User, Mail, FileText } from "lucide-react";
+import { goeyToast } from "goey-toast";
 
 export function AdminDashboard() {
   const { ready } = useAppState();
@@ -48,11 +49,13 @@ export function AdminDashboard() {
 
       if (res.ok) {
         setBusinesses(prev => prev.filter(b => b._id !== id));
+        goeyToast.success(`Business ${status.toLowerCase()} successfully`);
       } else {
-        alert("Failed to review business");
+        goeyToast.error(`Failed to review business: ${res.statusText}`);
       }
     } catch (err) {
       console.error("Review error", err);
+      goeyToast.error("An error occurred while reviewing the business");
     }
   };
 

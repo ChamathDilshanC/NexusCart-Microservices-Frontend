@@ -47,4 +47,5 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
 export async function GET(req: NextRequest, props: { params: Promise<{ path: string[] }> }) { return proxyRequest(req, props, 'GET'); }
 export async function POST(req: NextRequest, props: { params: Promise<{ path: string[] }> }) { return proxyRequest(req, props, 'POST'); }
 export async function PUT(req: NextRequest, props: { params: Promise<{ path: string[] }> }) { return proxyRequest(req, props, 'PUT'); }
+export async function PATCH(req: NextRequest, props: { params: Promise<{ path: string[] }> }) { return proxyRequest(req, props, 'PATCH'); }
 export async function DELETE(req: NextRequest, props: { params: Promise<{ path: string[] }> }) { return proxyRequest(req, props, 'DELETE'); }

@@ -30,6 +30,8 @@ export const viewport = {
   themeColor: "#0a0a0a",
 };
 
+import { GoeyToaster } from 'goey-toast';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -44,6 +46,7 @@ export default function RootLayout({
         <ScrollProvider>
           <AppStateProvider>
             {children}
+            <GoeyToaster />
           </AppStateProvider>
         </ScrollProvider>
       </body>
