@@ -187,9 +187,9 @@ export function LiquidRevealCanvas() {
 
 function CarouselCard() {
   const items = [
-    { caption: "E-commerce Platform", title: "Built to scale." },
-    { caption: "Storefront Design", title: "Crafted to convert." },
-    { caption: "Brand systems", title: "Designed to last." },
+    { caption: "Microservices", title: "Highly scalable architecture." },
+    { caption: "Vendor Portal", title: "Manage products effortlessly." },
+    { caption: "Global Reach", title: "Enterprise-grade performance." },
   ];
   const [idx, setIdx] = useState(0);
 
@@ -266,8 +266,8 @@ export function Hero() {
 
   const easeOutCubic = [0.215, 0.61, 0.355, 1] as const;
 
-  const titleLines = ["Bold ideas,", "shipped with", "quiet precision"];
-  const partners = ["Kaido", "Northpeak", "Vellum", "Orbit", "Brightline", "Cobalt", "Mesa"];
+  const titleLines = ["Next-generation", "Microservices", "E-commerce"];
+  const partners = ["Stripe", "Docker", "Next.js", "Azure", "Redis", "MongoDB", "Node.js"];
 
   return (
     <section id="home" className="relative isolate overflow-hidden rounded-b-[2rem] bg-[var(--color-hero-to)]">
@@ -279,7 +279,7 @@ export function Hero() {
         initial={{ opacity: 0, y: 20 }}
         animate={ready ? { opacity: 0.4, y: 0 } : {}}
         transition={{ type: "spring", stiffness: 120, damping: 30, delay: 0.3 }}
-        className="pointer-events-none absolute inset-x-0 bottom-[7rem] z-[1] select-none text-center text-[10rem] font-bold leading-none text-[rgba(255,255,255,0.4)]"
+        className="pointer-events-none absolute inset-x-0 bottom-[7rem] z-[1] select-none text-center text-[10rem] font-bold leading-none text-[rgba(255,255,255,0.4)] tracking-tighter"
       >
         NEXUSCART
       </motion.div>
@@ -295,7 +295,7 @@ export function Hero() {
           >
             <div className="inline-flex items-center gap-[0.5rem] text-[0.875rem] font-medium text-[rgba(17,17,17,0.7)]">
               <div className="h-[0.375rem] w-[0.375rem] rounded-[9999px] bg-[rgba(17,17,17,0.5)]" />
-              Enterprise E-commerce
+              NexusCart Platform
             </div>
           </motion.div>
 
@@ -324,7 +324,7 @@ export function Hero() {
               {[...Array(5)].map((_, i) => <Star key={i} className="h-[1em] w-[1em]" />)}
             </span>
             <span className="text-[0.875rem] font-medium text-[rgba(17,17,17,0.7)]">
-              200+ brands shipped
+              Built for high performance
             </span>
           </motion.div>
 
@@ -344,7 +344,7 @@ export function Hero() {
               const el = document.getElementById("platform");
               if (el) el.scrollIntoView({ behavior: "smooth" });
             }}>
-              View Work
+              View Features
             </PillButton>
           </motion.div>
         </div>
@@ -367,7 +367,7 @@ export function Hero() {
             className="w-full max-w-[24rem] lg:w-[19rem]"
           >
             <div className="mb-[0.75rem] text-left text-[0.75rem] font-medium text-[rgba(17,17,17,0.45)] lg:text-right">
-              Trusted by
+              Powered by
             </div>
             <div className="grid grid-cols-4 gap-x-[1rem] gap-y-[0.75rem]">
               {partners.map((p, i) => (
@@ -393,10 +393,10 @@ export function Hero() {
         transition={{ delay: 0.9, duration: 0.6 }}
         className="shell flex items-center justify-between gap-[0.75rem] border-t border-[rgba(17,17,17,0.1)] p-[1.25rem] text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.6)] sm:px-[2rem]"
       >
-        <span>Working since 2014</span>
-        <span className="hidden sm:inline">Remote-first, worldwide</span>
+        <span>Version 1.0.0</span>
+        <span className="hidden sm:inline">Open Source & Scalable</span>
         <span className="inline-flex gap-[0.5rem]">
-          Scroll to explore <span>↓</span>
+          Scroll to explore <span> </span>
         </span>
       </motion.div>
     </section>
