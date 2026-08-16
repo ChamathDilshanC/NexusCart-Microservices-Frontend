@@ -12,7 +12,7 @@ const ASSET_BASE_URL = "https://api.getlayers.ai/storage/v1/object/public/public
 const beforeSrc = `${ASSET_BASE_URL}/hero/after.jpg`;
 const afterSrc = `${ASSET_BASE_URL}/hero/before.jpg`;
 
-function LiquidRevealCanvas() {
+export function LiquidRevealCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
