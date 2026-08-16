@@ -118,6 +118,22 @@ export function AuthModal() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = await apiCall("forgot-password", { email });
+    if (data) {
+      setTimeout(() => setAuthView("reset_password"), 1000);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = await apiCall("reset-password", { email, otp, newPassword: password });
+    if (data) {
+      setTimeout(() => setAuthView("login"), 1000);
+    }
+  };
+
   const slideVariants = {
     initial: { opacity: 0, x: 20 },
     animate: { opacity: 1, x: 0 },
@@ -165,12 +181,16 @@ export function AuthModal() {
                       {authView === 'signup' && "Create an account"}
                       {authView === 'otp' && "Verify your email"}
                       {authView === 'business_register' && "Vendor Onboarding"}
+                      {authView === 'forgot_password' && "Reset your password"}
+                      {authView === 'reset_password' && "Check your email"}
                     </div>
                     <h2 className="text-[1.5rem] font-semibold tracking-[-.01em] sm:text-[1.875rem]">
                       {authView === 'login' && "Sign in to NexusCart."}
                       {authView === 'signup' && "Join the platform."}
                       {authView === 'otp' && "Enter your 6-digit code."}
                       {authView === 'business_register' && "Register your business."}
+                      {authView === 'forgot_password' && "Forgot your password?"}
+                      {authView === 'reset_password' && "Create new password."}
                     </h2>
                   </div>
 
@@ -187,7 +207,10 @@ export function AuthModal() {
                         <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
                       </label>
                       <label className="flex flex-col gap-[0.5rem]">
-                        <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Password</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Password</span>
+                          <button type="button" onClick={() => setAuthView('forgot_password')} className="text-[0.75rem] font-medium text-[rgba(17,17,17,0.6)] hover:text-[#111] transition-colors">Forgot?</button>
+                        </div>
                         <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
                       </label>
                       <div className="mt-auto pt-[1rem] flex items-center justify-between gap-[1rem]">
@@ -251,6 +274,52 @@ export function AuthModal() {
                         </button>
                         <PillButton variant="dark" type="submit" disabled={status === "loading"}>
                           {status === "loading" ? "Verifying…" : (status === "success" ? "Verified" : "Verify Code")}
+                        </PillButton>
+                      </div>
+                    </form>
+                  )}
+
+                  {authView === 'forgot_password' && (
+                    <form onSubmit={handleForgotPassword} className="flex flex-col gap-[1rem] flex-1">
+                      <p className="text-[0.875rem] text-[rgba(17,17,17,0.6)] mb-[0.5rem]">
+                        Enter your email address and we'll send you a 6-digit code to reset your password.
+                      </p>
+                      <label className="flex flex-col gap-[0.5rem]">
+                        <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Email</span>
+                        <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
+                      </label>
+                      <div className="mt-auto pt-[2rem] flex items-center justify-between gap-[1rem]">
+                        <button type="button" onClick={() => setAuthView('login')} className="text-[0.75rem] font-medium text-[rgba(17,17,17,0.6)] hover:text-[#111] transition-colors">
+                          Back to login
+                        </button>
+                        <PillButton variant="dark" type="submit" disabled={status === "loading"}>
+                          {status === "loading" ? "Sending…" : (status === "success" ? "Sent" : "Send Code")}
+                        </PillButton>
+                      </div>
+                    </form>
+                  )}
+
+                  {authView === 'reset_password' && (
+                    <form onSubmit={handleResetPassword} className="flex flex-col gap-[1rem] flex-1">
+                      <p className="text-[0.875rem] text-[rgba(17,17,17,0.6)] mb-[0.5rem]">
+                        We sent a verification code to <strong>{email}</strong>.
+                      </p>
+                      <div className="flex gap-[1rem]">
+                        <label className="flex flex-col gap-[0.5rem] flex-1">
+                          <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">Verification Code</span>
+                          <input type="text" required value={otp} onChange={e => setOtp(e.target.value)} placeholder="123456" maxLength={6} className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[1.25rem] tracking-[.25em] text-center font-medium outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
+                        </label>
+                      </div>
+                      <label className="flex flex-col gap-[0.5rem]">
+                        <span className="text-[0.75rem] font-medium uppercase tracking-[.025em] text-[rgba(17,17,17,0.5)]">New Password</span>
+                        <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full rounded-[0.875rem] border border-[var(--color-line)] bg-[rgba(241,240,238,0.5)] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none transition-colors focus:border-[rgba(17,17,17,0.3)] focus:bg-[#fff]" />
+                      </label>
+                      <div className="mt-auto pt-[1.5rem] flex items-center justify-between gap-[1rem]">
+                        <button type="button" onClick={() => setAuthView('forgot_password')} className="text-[0.75rem] font-medium text-[rgba(17,17,17,0.6)] hover:text-[#111] transition-colors">
+                          Back
+                        </button>
+                        <PillButton variant="dark" type="submit" disabled={status === "loading"}>
+                          {status === "loading" ? "Resetting…" : (status === "success" ? "Done" : "Reset Password")}
                         </PillButton>
                       </div>
                     </form>
