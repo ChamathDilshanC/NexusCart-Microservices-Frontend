@@ -58,12 +58,11 @@ export function Header() {
             {/* Left */}
             <button onClick={() => scrollTo("home")} className="group outline-none">
               <motion.span 
-                className="flex items-center gap-[0.5rem] text-[1.125rem] font-semibold tracking-[-.01em]"
+                className="flex items-center gap-[0.5rem]"
                 whileHover="hover"
                 variants={{ hover: { scale: 1.04, transition: { type: "spring", stiffness: 320, damping: 18 } } }}
               >
-                <LogoMark className="h-[1.25rem] w-[1.25rem] text-[var(--color-accent)]" />
-                NexusCart
+                <img src="/Logo/Logo with Text.png" alt="NexusCart" className="h-7 w-auto object-contain" />
               </motion.span>
             </button>
 
@@ -198,9 +197,8 @@ export function NavMenu() {
         >
           {/* Top bar */}
           <div className="shell flex items-center justify-between p-[1.25rem] sm:px-[2rem] sm:py-[1.5rem] w-full">
-            <div className="flex items-center gap-[0.5rem] text-[1.125rem] font-semibold">
-              <LogoMark className="h-[1.25rem] w-[1.25rem] text-[var(--color-accent-from)]" />
-              NexusCart
+            <div className="flex items-center gap-[0.5rem]">
+              <img src="/Logo/Logo with Text.png" alt="NexusCart" className="h-7 w-auto object-contain invert" />
             </div>
             <button 
               onClick={() => setIsMenuOpen(false)}
