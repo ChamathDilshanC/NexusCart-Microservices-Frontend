@@ -33,7 +33,7 @@ function useClock() {
 }
 
 export function Header() {
-  const { ready, setIsMenuOpen, setIsModalOpen, currentUser, setAuthView, setIsAuthModalOpen } = useAppState();
+  const { ready, setIsMenuOpen, setIsModalOpen, currentUser, setCurrentUser, setAuthView, setIsAuthModalOpen } = useAppState();
   const { time, dateStr, mounted } = useClock();
 
   const scrollTo = (id: string) => {
@@ -106,8 +106,19 @@ export function Header() {
               </div>
 
               {currentUser ? (
-                <div className="hidden lg:flex items-center gap-[0.5rem] px-[0.75rem] py-[0.5rem] text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)]">
-                  {currentUser.name} ({currentUser.role})
+                <div className="hidden lg:flex items-center gap-[0.75rem]">
+                  <div className="text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)]">
+                    {currentUser.name} ({currentUser.role})
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setCurrentUser(null);
+                      localStorage.removeItem('nexus_user');
+                    }}
+                    className="rounded-[0.875rem] bg-[rgba(241,240,238,0.6)] px-[0.75rem] py-[0.5rem] text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)] transition-colors hover:bg-[rgba(17,17,17,0.1)]"
+                  >
+                    Logout
+                  </button>
                 </div>
               ) : (
                 <button 
