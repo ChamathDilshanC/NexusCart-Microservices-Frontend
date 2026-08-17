@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Onest } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/Providers";
 
 const onest = Onest({
   variable: "--font-sans",
@@ -41,8 +42,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${onest.variable} scroll-smooth`}>
-      <body className="bg-black text-white antialiased">{children}</body>
+    <html lang="en" className={`${onest.variable} scroll-smooth`} data-scroll-behavior="smooth">
+      <body className="bg-black text-white antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
