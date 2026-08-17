@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScroll } from "./ScrollProvider";
 import { useAppState as useAppStateShared, cn, PillButton } from "./Shared";
-import { X, LogoMark } from "./Icons";
+import { X } from "lucide-react";
+import { LogoMark } from "./Icons";
 
 export function RequestModal() {
   const { isModalOpen, setIsModalOpen } = useAppStateShared();

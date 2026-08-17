@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useAppState, PillButton, cn } from "./Shared";
-import { ArrowRight, CircleDot, LogoMark, Star } from "./Icons";
+import { ArrowRight, CircleDot, Star } from "lucide-react";
+import { LogoMark } from "./Icons";
 
 // The original prompt requires specific image mapping for the Liquid Reveal:
 // beforeSrc (the always-visible base / LCP image) = .../hero/after.jpg

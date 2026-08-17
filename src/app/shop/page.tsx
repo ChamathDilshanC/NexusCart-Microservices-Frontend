@@ -40,11 +40,11 @@ function CheckToggle({ checked, onChange, label }: { checked: boolean; onChange:
   return (
     <button type="button" onClick={onChange} className="flex w-full items-center gap-[0.625rem] group">
       <span className={`relative flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-all duration-200 ${
-        checked ? "border-[var(--shop-accent)] bg-[var(--shop-accent)]" : "border-[rgba(0,0,0,0.2)] bg-[#fff] group-hover:border-[rgba(0,0,0,0.35)]"
+        checked ? "border-[var(--color-accent)] bg-[var(--color-accent)]" : "border-[rgba(0,0,0,0.2)] bg-[#fff] group-hover:border-[rgba(0,0,0,0.35)]"
       }`}>
         {checked && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
       </span>
-      <span className={`text-[0.8125rem] transition-colors ${checked ? "font-medium text-[var(--shop-text)]" : "text-[var(--shop-text-muted)] group-hover:text-[var(--shop-text)]"}`}>
+      <span className={`text-[0.8125rem] transition-colors ${checked ? "font-medium text-[#111111]" : "text-[rgba(17,17,17,0.5)] group-hover:text-[#111111]"}`}>
         {label}
       </span>
     </button>
@@ -203,15 +203,13 @@ export default function ShopPage() {
     return pages;
   };
 
-  const shopFont = "'Red Hat Display', sans-serif";
-
   return (
     <>
       <Header />
       <NavMenu />
       <AuthModal />
 
-      <main className="min-h-screen" style={{ background: "var(--shop-bg)", fontFamily: shopFont }}>
+      <main className="min-h-screen" style={{ background: "var(--color-surface)" }}>
         {/* Banner Marquee */}
         {banners.length > 0 && (
           <div className="relative w-full overflow-hidden bg-[#111]">
@@ -266,7 +264,7 @@ export default function ShopPage() {
                     <button
                       key={i}
                       onClick={() => setBannerIndex(i)}
-                      className={`h-[0.375rem] rounded-full transition-all duration-300 ${i === bannerIndex ? "w-[1.5rem] bg-[var(--shop-accent)]" : "w-[0.375rem] bg-[rgba(255,255,255,0.4)]"}`}
+                      className={`h-[0.375rem] rounded-full transition-all duration-300 ${i === bannerIndex ? "w-[1.5rem] bg-[var(--color-accent)]" : "w-[0.375rem] bg-[rgba(255,255,255,0.4)]"}`}
                     />
                   ))}
                 </div>
@@ -278,13 +276,13 @@ export default function ShopPage() {
         {/* Breadcrumb */}
         <div className="border-b border-[rgba(0,0,0,0.06)] bg-[#fff]">
           <div className="shell flex items-center gap-[0.5rem] px-[1.25rem] py-[0.75rem] text-[0.8125rem] sm:px-[2rem]">
-            <a href="/" className="text-[var(--shop-text-muted)] hover:text-[var(--shop-text)] transition-colors"><Home className="h-3.5 w-3.5" /></a>
+            <a href="/" className="text-[rgba(17,17,17,0.5)] hover:text-[#111111] transition-colors"><Home className="h-3.5 w-3.5" /></a>
             <ChevronRight className="h-3 w-3 text-[rgba(0,0,0,0.2)]" />
-            <a href="/shop" className="text-[var(--shop-text-muted)] hover:text-[var(--shop-text)] transition-colors">Shop</a>
+            <a href="/shop" className="text-[rgba(17,17,17,0.5)] hover:text-[#111111] transition-colors">Shop</a>
             {selectedCategories.length === 1 && (
               <>
                 <ChevronRight className="h-3 w-3 text-[rgba(0,0,0,0.2)]" />
-                <span className="font-medium text-[var(--shop-text)]">{selectedCategories[0]}</span>
+                <span className="font-medium text-[#111111]">{selectedCategories[0]}</span>
               </>
             )}
           </div>
@@ -292,10 +290,10 @@ export default function ShopPage() {
 
         {/* Page heading */}
         <div className="shell px-[1.25rem] pt-[1.75rem] pb-[1.25rem] sm:px-[2rem]">
-          <h1 className="text-[1.625rem] font-bold tracking-[-0.02em] text-[var(--shop-text)] sm:text-[1.875rem]">
+          <h1 className="text-[1.625rem] font-bold tracking-[-0.02em] text-[#111111] sm:text-[1.875rem]">
             {selectedCategories.length === 1 ? selectedCategories[0] : "All Products"}
           </h1>
-          <p className="mt-[0.25rem] text-[0.8125rem] text-[var(--shop-text-muted)]">
+          <p className="mt-[0.25rem] text-[0.8125rem] text-[rgba(17,17,17,0.5)]">
             {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
           </p>
         </div>
@@ -304,12 +302,12 @@ export default function ShopPage() {
         <div className="shell px-[1.25rem] pb-[0.75rem] sm:px-[2rem] lg:hidden">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="inline-flex items-center gap-[0.5rem] rounded-[10px] border border-[rgba(0,0,0,0.08)] bg-[#fff] px-[1.125rem] py-[0.625rem] text-[0.8125rem] font-semibold text-[var(--shop-text)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] active:scale-[0.98]"
+            className="inline-flex items-center gap-[0.5rem] rounded-[10px] border border-[rgba(0,0,0,0.08)] bg-[#fff] px-[1.125rem] py-[0.625rem] text-[0.8125rem] font-semibold text-[#111111] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] active:scale-[0.98]"
           >
             <SlidersHorizontal className="h-4 w-4" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="flex h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full px-[0.25rem] text-[0.6rem] font-bold text-white" style={{ background: "var(--shop-accent)" }}>
+              <span className="flex h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full px-[0.25rem] text-[0.6rem] font-bold text-white" style={{ background: "var(--color-accent)" }}>
                 {activeFilterCount}
               </span>
             )}
@@ -324,19 +322,19 @@ export default function ShopPage() {
               {/* Mobile close */}
               {sidebarOpen && (
                 <div className="mb-[1.25rem] flex items-center justify-between lg:hidden">
-                  <span className="text-[1rem] font-bold text-[var(--shop-text)]">Filters</span>
+                  <span className="text-[1rem] font-bold text-[#111111]">Filters</span>
                   <button onClick={() => setSidebarOpen(false)} className="rounded-[6px] p-[0.25rem] hover:bg-[rgba(0,0,0,0.05)]">
-                    <X className="h-5 w-5 text-[var(--shop-text)]" />
+                    <X className="h-5 w-5 text-[#111111]" />
                   </button>
                 </div>
               )}
 
               {/* Sidebar header */}
               <div className="mb-[1.25rem] hidden items-center gap-[0.5rem] lg:flex">
-                <Filter className="h-4 w-4 text-[var(--shop-text-muted)]" />
-                <span className="text-[0.8125rem] font-semibold text-[var(--shop-text)]">Filters</span>
+                <Filter className="h-4 w-4 text-[rgba(17,17,17,0.5)]" />
+                <span className="text-[0.8125rem] font-semibold text-[#111111]">Filters</span>
                 {hasActiveFilters && (
-                  <button onClick={clearFilters} className="ml-auto text-[0.7rem] font-medium text-[var(--shop-accent)] hover:underline">
+                  <button onClick={clearFilters} className="ml-auto text-[0.7rem] font-medium text-[var(--color-accent)] hover:underline">
                     Clear all
                   </button>
                 )}
@@ -345,26 +343,26 @@ export default function ShopPage() {
               {/* Search */}
               <div className="mb-[1.25rem] border-b border-[rgba(0,0,0,0.06)] pb-[1.25rem]">
                 <div className="relative">
-                  <Search className="absolute left-[0.75rem] top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--shop-text-muted)]" />
+                  <Search className="absolute left-[0.75rem] top-1/2 h-4 w-4 -translate-y-1/2 text-[rgba(17,17,17,0.5)]" />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search products..."
-                    className="w-full rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--shop-bg)] py-[0.625rem] pl-[2.375rem] pr-[0.75rem] text-[0.8125rem] text-[var(--shop-text)] outline-none transition-all focus:border-[var(--shop-accent)] focus:bg-[#fff] focus:shadow-[0_0_0_3px_rgba(34,211,238,0.1)] placeholder:text-[rgba(100,100,100,0.5)]"
+                    className="w-full rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--color-surface)] py-[0.625rem] pl-[2.375rem] pr-[0.75rem] text-[0.8125rem] text-[#111111] outline-none transition-all focus:border-[var(--color-accent)] focus:bg-[#fff] focus:shadow-[0_0_0_3px_rgba(177,95,44,0.1)] placeholder:text-[rgba(100,100,100,0.5)]"
                   />
                 </div>
               </div>
 
               {/* Sort */}
               <div className="mb-[1.25rem] border-b border-[rgba(0,0,0,0.06)] pb-[1.25rem]">
-                <label className="mb-[0.5rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--shop-text-muted)]">
+                <label className="mb-[0.5rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[rgba(17,17,17,0.5)]">
                   <ArrowUpDown className="h-3 w-3" /> Sort By
                 </label>
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value)}
-                  className="w-full cursor-pointer appearance-none rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--shop-bg)] px-[0.75rem] py-[0.625rem] text-[0.8125rem] font-medium text-[var(--shop-text)] outline-none transition-all focus:border-[var(--shop-accent)] focus:bg-[#fff]"
+                  className="w-full cursor-pointer appearance-none rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--color-surface)] px-[0.75rem] py-[0.625rem] text-[0.8125rem] font-medium text-[#111111] outline-none transition-all focus:border-[var(--color-accent)] focus:bg-[#fff]"
                 >
                   <option value="newest">Newest First</option>
                   <option value="price_asc">Price: Low → High</option>
@@ -375,29 +373,29 @@ export default function ShopPage() {
 
               {/* Price Range */}
               <div className="mb-[1.25rem] border-b border-[rgba(0,0,0,0.06)] pb-[1.25rem]">
-                <label className="mb-[0.5rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--shop-text-muted)]">
+                <label className="mb-[0.5rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[rgba(17,17,17,0.5)]">
                   <Tag className="h-3 w-3" /> Price Range
                 </label>
                 <div className="flex items-center gap-[0.5rem]">
                   <div className="relative flex-1">
-                    <span className="absolute left-[0.625rem] top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--shop-text-muted)]">$</span>
+                    <span className="absolute left-[0.625rem] top-1/2 -translate-y-1/2 text-[0.7rem] text-[rgba(17,17,17,0.5)]">$</span>
                     <input
                       type="number"
                       value={priceMin}
                       onChange={(e) => setPriceMin(Number(e.target.value))}
-                      className="w-full rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--shop-bg)] py-[0.5rem] pl-[1.375rem] pr-[0.5rem] text-[0.8125rem] text-[var(--shop-text)] outline-none focus:border-[var(--shop-accent)] focus:bg-[#fff]"
+                      className="w-full rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--color-surface)] py-[0.5rem] pl-[1.375rem] pr-[0.5rem] text-[0.8125rem] text-[#111111] outline-none focus:border-[var(--color-accent)] focus:bg-[#fff]"
                       placeholder="Min"
                       min={0}
                     />
                   </div>
                   <div className="h-[1px] w-[0.75rem] bg-[rgba(0,0,0,0.15)]" />
                   <div className="relative flex-1">
-                    <span className="absolute left-[0.625rem] top-1/2 -translate-y-1/2 text-[0.7rem] text-[var(--shop-text-muted)]">$</span>
+                    <span className="absolute left-[0.625rem] top-1/2 -translate-y-1/2 text-[0.7rem] text-[rgba(17,17,17,0.5)]">$</span>
                     <input
                       type="number"
                       value={priceMax}
                       onChange={(e) => setPriceMax(Number(e.target.value))}
-                      className="w-full rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--shop-bg)] py-[0.5rem] pl-[1.375rem] pr-[0.5rem] text-[0.8125rem] text-[var(--shop-text)] outline-none focus:border-[var(--shop-accent)] focus:bg-[#fff]"
+                      className="w-full rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[var(--color-surface)] py-[0.5rem] pl-[1.375rem] pr-[0.5rem] text-[0.8125rem] text-[#111111] outline-none focus:border-[var(--color-accent)] focus:bg-[#fff]"
                       placeholder="Max"
                       min={0}
                     />
@@ -407,7 +405,7 @@ export default function ShopPage() {
 
               {/* Availability */}
               <div className="mb-[1.25rem] border-b border-[rgba(0,0,0,0.06)] pb-[1.25rem]">
-                <label className="mb-[0.625rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--shop-text-muted)]">
+                <label className="mb-[0.625rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[rgba(17,17,17,0.5)]">
                   <CircleCheck className="h-3 w-3" /> Availability
                 </label>
                 <div className="flex flex-col gap-[0.5rem]">
@@ -419,7 +417,7 @@ export default function ShopPage() {
               {/* Categories */}
               {categories.length > 0 && (
                 <div className="mb-[0.5rem]">
-                  <label className="mb-[0.625rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--shop-text-muted)]">
+                  <label className="mb-[0.625rem] flex items-center gap-[0.375rem] text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[rgba(17,17,17,0.5)]">
                     <Box className="h-3 w-3" /> Categories
                   </label>
                   <div className="flex flex-col gap-[0.5rem]">
@@ -434,7 +432,7 @@ export default function ShopPage() {
               {hasActiveFilters && (
                 <button
                   onClick={clearFilters}
-                  className="mt-[1rem] flex w-full items-center justify-center gap-[0.375rem] rounded-[8px] border border-[rgba(0,0,0,0.08)] px-[0.75rem] py-[0.625rem] text-[0.8125rem] font-medium text-[var(--shop-text-muted)] transition-all hover:border-[rgba(0,0,0,0.15)] hover:bg-[var(--shop-bg)] hover:text-[var(--shop-text)]"
+                  className="mt-[1rem] flex w-full items-center justify-center gap-[0.375rem] rounded-[8px] border border-[rgba(0,0,0,0.08)] px-[0.75rem] py-[0.625rem] text-[0.8125rem] font-medium text-[rgba(17,17,17,0.5)] transition-all hover:border-[rgba(0,0,0,0.15)] hover:bg-[var(--color-surface)] hover:text-[#111111]"
                 >
                   <X className="h-3.5 w-3.5" />
                   Clear All Filters
@@ -445,8 +443,8 @@ export default function ShopPage() {
               {sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(false)}
-                  className="mt-[1rem] w-full rounded-[10px] py-[0.75rem] text-[0.875rem] font-bold text-[var(--shop-header-bg)] shadow-[0_2px_8px_rgba(34,211,238,0.3)] transition-all hover:shadow-[0_4px_16px_rgba(34,211,238,0.4)] lg:hidden"
-                  style={{ background: "var(--shop-accent)" }}
+                  className="mt-[1rem] w-full rounded-[10px] py-[0.75rem] text-[0.875rem] font-bold text-[var(--color-ink)] shadow-[0_2px_8px_rgba(177,95,44,0.3)] transition-all hover:shadow-[0_4px_16px_rgba(177,95,44,0.4)] lg:hidden"
+                  style={{ background: "var(--color-accent)" }}
                 >
                   Show {filteredProducts.length} Results
                 </button>
@@ -459,21 +457,21 @@ export default function ShopPage() {
             {loading ? (
               <div className="flex h-[400px] items-center justify-center rounded-[12px] bg-[#fff] shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
                 <div className="flex flex-col items-center gap-[0.75rem]">
-                  <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[rgba(0,0,0,0.06)] border-t-[var(--shop-accent)]" />
-                  <span className="text-[0.8125rem] font-medium text-[var(--shop-text-muted)]">Loading products...</span>
+                  <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[rgba(0,0,0,0.06)] border-t-[var(--color-accent)]" />
+                  <span className="text-[0.8125rem] font-medium text-[rgba(17,17,17,0.5)]">Loading products...</span>
                 </div>
               </div>
             ) : paginatedProducts.length === 0 ? (
               <div className="flex h-[400px] flex-col items-center justify-center gap-[1rem] rounded-[12px] bg-[#fff] shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-                <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-[var(--shop-bg)]">
+                <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-[var(--color-surface)]">
                   <ShoppingBag className="h-8 w-8 text-[rgba(0,0,0,0.2)]" />
                 </div>
                 <div className="text-center">
-                  <p className="text-[1rem] font-semibold text-[var(--shop-text)]">No products found</p>
-                  <p className="mt-[0.25rem] text-[0.8125rem] text-[var(--shop-text-muted)]">Try adjusting your filters</p>
+                  <p className="text-[1rem] font-semibold text-[#111111]">No products found</p>
+                  <p className="mt-[0.25rem] text-[0.8125rem] text-[rgba(17,17,17,0.5)]">Try adjusting your filters</p>
                 </div>
                 {hasActiveFilters && (
-                  <button onClick={clearFilters} className="mt-[0.5rem] rounded-[8px] px-[1rem] py-[0.5rem] text-[0.8125rem] font-semibold text-white transition-all hover:brightness-110" style={{ background: "var(--shop-accent)" }}>
+                  <button onClick={clearFilters} className="mt-[0.5rem] rounded-[8px] px-[1rem] py-[0.5rem] text-[0.8125rem] font-semibold text-white transition-all hover:brightness-110" style={{ background: "var(--color-accent)" }}>
                     Clear all filters
                   </button>
                 )}
@@ -487,7 +485,7 @@ export default function ShopPage() {
                       key={p._id}
                       className="group relative flex flex-col overflow-hidden rounded-[12px] bg-[#fff] shadow-[0_1px_4px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-[3px] hover:shadow-[0_8px_30px_rgba(0,0,0,0.1)]"
                     >
-                      <a href={`/product/${p._id}`} className="relative block aspect-square overflow-hidden bg-[var(--shop-bg)]">
+                      <a href={`/product/${p._id}`} className="relative block aspect-square overflow-hidden bg-[var(--color-surface)]">
                         {p.imageUrl ? (
                           <img
                             src={p.imageUrl}
@@ -501,7 +499,7 @@ export default function ShopPage() {
                         )}
                         {/* Quick view overlay */}
                         <div className="absolute inset-0 flex items-center justify-center bg-[rgba(0,0,0,0.15)] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                          <span className="inline-flex items-center gap-[0.375rem] rounded-[8px] bg-white/90 px-[0.875rem] py-[0.5rem] text-[0.75rem] font-semibold text-[var(--shop-text)] shadow-lg backdrop-blur-sm">
+                          <span className="inline-flex items-center gap-[0.375rem] rounded-[8px] bg-white/90 px-[0.875rem] py-[0.5rem] text-[0.75rem] font-semibold text-[#111111] shadow-lg backdrop-blur-sm">
                             <Eye className="h-3.5 w-3.5" /> Quick View
                           </span>
                         </div>
@@ -522,19 +520,19 @@ export default function ShopPage() {
                         )}
                       </a>
                       <div className="flex flex-1 flex-col p-[1rem]">
-                        <span className="mb-[0.25rem] text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[var(--shop-accent)]">{p.category}</span>
-                        <a href={`/product/${p._id}`} className="text-[0.875rem] font-semibold leading-snug text-[var(--shop-text)] line-clamp-2 transition-colors hover:text-[var(--shop-accent)]">
+                        <span className="mb-[0.25rem] text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-[var(--color-accent)]">{p.category}</span>
+                        <a href={`/product/${p._id}`} className="text-[0.875rem] font-semibold leading-snug text-[#111111] line-clamp-2 transition-colors hover:text-[var(--color-accent)]">
                           {p.name}
                         </a>
                         <div className="mt-auto flex items-center justify-between pt-[0.875rem]">
-                          <span className="text-[1.25rem] font-bold tracking-[-0.02em] text-[var(--shop-text)]">
+                          <span className="text-[1.25rem] font-bold tracking-[-0.02em] text-[#111111]">
                             ${Number(p.price).toFixed(2)}
                           </span>
                           {p.stock > 0 && (
                             <button
                               onClick={(e) => { e.preventDefault(); addToCart(p); }}
-                              className="flex items-center gap-[0.375rem] rounded-[8px] px-[0.75rem] py-[0.4375rem] text-[0.7rem] font-bold text-[var(--shop-header-bg)] shadow-[0_2px_6px_rgba(34,211,238,0.25)] transition-all hover:shadow-[0_4px_12px_rgba(34,211,238,0.4)] hover:brightness-110 active:scale-95"
-                              style={{ background: "var(--shop-accent)" }}
+                              className="flex items-center gap-[0.375rem] rounded-[8px] px-[0.75rem] py-[0.4375rem] text-[0.7rem] font-bold text-[var(--color-ink)] shadow-[0_2px_6px_rgba(177,95,44,0.25)] transition-all hover:shadow-[0_4px_12px_rgba(177,95,44,0.4)] hover:brightness-110 active:scale-95"
+                              style={{ background: "var(--color-accent)" }}
                             >
                               <ShoppingCart className="h-3.5 w-3.5" />
                               Add
@@ -552,13 +550,13 @@ export default function ShopPage() {
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="flex h-[2.25rem] w-[2.25rem] items-center justify-center rounded-[8px] bg-[#fff] text-[var(--shop-text-muted)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex h-[2.25rem] w-[2.25rem] items-center justify-center rounded-[8px] bg-[#fff] text-[rgba(17,17,17,0.5)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     {getPageNumbers().map((page, i) =>
                       typeof page === "string" ? (
-                        <span key={`dots-${i}`} className="flex h-[2.25rem] w-[2.25rem] items-center justify-center text-[0.875rem] text-[var(--shop-text-muted)]">
+                        <span key={`dots-${i}`} className="flex h-[2.25rem] w-[2.25rem] items-center justify-center text-[0.875rem] text-[rgba(17,17,17,0.5)]">
                           ...
                         </span>
                       ) : (
@@ -567,10 +565,10 @@ export default function ShopPage() {
                           onClick={() => setCurrentPage(page)}
                           className={`flex h-[2.25rem] w-[2.25rem] items-center justify-center rounded-[8px] text-[0.875rem] font-semibold transition-all ${
                             currentPage === page
-                              ? "text-white shadow-[0_2px_8px_rgba(34,211,238,0.35)]"
-                              : "bg-[#fff] text-[var(--shop-text)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                              ? "text-white shadow-[0_2px_8px_rgba(177,95,44,0.35)]"
+                              : "bg-[#fff] text-[#111111] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                           }`}
-                          style={currentPage === page ? { background: "var(--shop-accent)" } : {}}
+                          style={currentPage === page ? { background: "var(--color-accent)" } : {}}
                         >
                           {page}
                         </button>
@@ -579,7 +577,7 @@ export default function ShopPage() {
                     <button
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
-                      className="flex h-[2.25rem] w-[2.25rem] items-center justify-center rounded-[8px] bg-[#fff] text-[var(--shop-text-muted)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex h-[2.25rem] w-[2.25rem] items-center justify-center rounded-[8px] bg-[#fff] text-[rgba(17,17,17,0.5)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>

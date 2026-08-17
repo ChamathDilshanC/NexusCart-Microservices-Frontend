@@ -4,6 +4,7 @@ import "./globals.css";
 import { ScrollProvider } from "@/components/ScrollProvider";
 import { AppStateProvider } from "@/components/Shared";
 import { ToastProvider } from "@/components/ToastProvider";
+import { ViewportScaler } from "@/components/ViewportScaler";
 
 const onest = Onest({
   variable: "--font-sans",
@@ -42,6 +43,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#0a0a0a" />
       </head>
       <body className="antialiased">
+        <ViewportScaler />
         <ScrollProvider>
           <AppStateProvider>
             {children}

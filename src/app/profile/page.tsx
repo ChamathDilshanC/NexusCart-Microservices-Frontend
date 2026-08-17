@@ -5,15 +5,15 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Header, NavMenu } from "@/components/Header";
 import { Footer } from "@/components/Sections";
-import { PillButton } from "@/components/Shared";
-import { Package, User, Mail, ShoppingBag, Clock, CheckCircle, Truck as TruckIcon, XCircle } from "lucide-react";
+import { PillButton, StatusPill, ORDER_STATUS_TONES } from "@/components/Shared";
+import { Package, Mail, ShoppingBag, Clock, CheckCircle, Truck as TruckIcon, XCircle } from "lucide-react";
 
-const statusConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-  PENDING: { icon: <Clock className="h-3.5 w-3.5" />, color: "text-yellow-600", bg: "bg-yellow-50" },
-  PAID: { icon: <CheckCircle className="h-3.5 w-3.5" />, color: "text-blue-600", bg: "bg-blue-50" },
-  SHIPPED: { icon: <TruckIcon className="h-3.5 w-3.5" />, color: "text-purple-600", bg: "bg-purple-50" },
-  DELIVERED: { icon: <CheckCircle className="h-3.5 w-3.5" />, color: "text-green-600", bg: "bg-green-50" },
-  CANCELLED: { icon: <XCircle className="h-3.5 w-3.5" />, color: "text-red-600", bg: "bg-red-50" },
+const statusIcons: Record<string, React.ReactNode> = {
+  PENDING: <Clock className="h-3.5 w-3.5" />,
+  PAID: <CheckCircle className="h-3.5 w-3.5" />,
+  SHIPPED: <TruckIcon className="h-3.5 w-3.5" />,
+  DELIVERED: <CheckCircle className="h-3.5 w-3.5" />,
+  CANCELLED: <XCircle className="h-3.5 w-3.5" />,
 };
 
 export default function ProfilePage() {
@@ -114,7 +114,6 @@ export default function ProfilePage() {
               ) : (
                 <div className="flex flex-col gap-[1rem]">
                   {orders.map((order) => {
-                    const sc = statusConfig[order.status] || statusConfig.PENDING;
                     return (
                       <div key={order._id} className="rounded-[1.5rem] border border-[var(--color-line)] p-[1.25rem] transition-colors hover:bg-[rgba(241,240,238,0.15)]">
                         <div className="flex items-center justify-between">
@@ -125,9 +124,9 @@ export default function ProfilePage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-[1rem]">
-                            <span className={`inline-flex items-center gap-[0.25rem] rounded-full px-[0.75rem] py-[0.25rem] text-[0.7rem] font-medium ${sc.bg} ${sc.color}`}>
-                              {sc.icon} {order.status}
-                            </span>
+                            <StatusPill tone={ORDER_STATUS_TONES[order.status] || "neutral"} icon={statusIcons[order.status]}>
+                              {order.status}
+                            </StatusPill>
                             <span className="text-[1rem] font-semibold">${Number(order.totalAmount).toFixed(2)}</span>
                           </div>
                         </div>

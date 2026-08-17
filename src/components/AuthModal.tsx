@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useScroll } from "./ScrollProvider";
 import { useAppState, cn, PillButton } from "./Shared";
-import { X, LogoMark } from "./Icons";
+import { X } from "lucide-react";
+import { LogoMark } from "./Icons";
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID";

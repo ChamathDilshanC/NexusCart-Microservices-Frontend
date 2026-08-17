@@ -8,8 +8,8 @@ import { Footer } from "@/components/Sections";
 import { RequestModal } from "@/components/RequestModal";
 import { AuthModal } from "@/components/AuthModal";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { useAppState, PillButton } from "@/components/Shared";
-import { ShoppingBag, Star, ArrowRight, Tag, Truck, Shield, RefreshCw } from "lucide-react";
+import { useAppState, PillButton, ProductCard } from "@/components/Shared";
+import { Star, Truck, Shield, RefreshCw } from "lucide-react";
 
 function FeaturedProducts() {
   const [products, setProducts] = useState<any[]>([]);
@@ -57,41 +57,7 @@ function FeaturedProducts() {
 
         <div className="grid grid-cols-1 gap-[1.5rem] sm:grid-cols-2 lg:grid-cols-4">
           {products.map((p, i) => (
-            <motion.a
-              key={p._id}
-              href={`/product/${p._id}`}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08, type: "spring", stiffness: 200, damping: 24 }}
-              whileHover={{ y: -6, transition: { type: "spring", stiffness: 300, damping: 20 } }}
-              className="group flex flex-col overflow-hidden rounded-[1.5rem] border border-[var(--color-line)] bg-[#fff] transition-shadow hover:shadow-lg"
-            >
-              <div className="relative aspect-square overflow-hidden bg-[rgba(241,240,238,0.5)]">
-                {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <ShoppingBag className="h-12 w-12 text-[rgba(17,17,17,0.15)]" />
-                  </div>
-                )}
-                {p.stock <= 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[rgba(0,0,0,0.4)]">
-                    <span className="rounded-full bg-[#fff] px-[1rem] py-[0.375rem] text-[0.75rem] font-semibold text-[#111]">Out of Stock</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-1 flex-col gap-[0.5rem] p-[1.25rem]">
-                <span className="text-[0.7rem] font-medium uppercase tracking-wider text-[rgba(17,17,17,0.4)]">{p.category}</span>
-                <h3 className="text-[1rem] font-medium leading-snug text-[#111] line-clamp-2">{p.name}</h3>
-                <div className="mt-auto flex items-center justify-between pt-[0.5rem]">
-                  <span className="text-[1.125rem] font-semibold text-[#111]">${Number(p.price).toFixed(2)}</span>
-                  {p.stock > 0 && (
-                    <span className="text-[0.7rem] font-medium text-green-600">In Stock</span>
-                  )}
-                </div>
-              </div>
-            </motion.a>
+            <ProductCard key={p._id} product={p} index={i} />
           ))}
         </div>
 

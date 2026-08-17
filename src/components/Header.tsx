@@ -2,9 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogoMark, Grid, X } from "./Icons";
-import { useAppState, cn, PillButton } from "./Shared";
-import { Search } from "lucide-react";
+import { useAppState } from "./Shared";
+import { Search, Menu, X, ShoppingBag, User as UserIcon } from "lucide-react";
 
 function useClock() {
   const [time, setTime] = useState("9:41am");
@@ -24,7 +23,7 @@ function useClock() {
       const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       setDateStr(`${now.getDate()} ${months[now.getMonth()]}, ${now.getFullYear()}`);
     };
-    
+
     tick(); // initial tick
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
@@ -33,18 +32,35 @@ function useClock() {
   return { time, dateStr, mounted };
 }
 
-export function Header() {
-  const { ready, setIsMenuOpen, setIsModalOpen, currentUser, setCurrentUser, setAuthView, setIsAuthModalOpen } = useAppState();
-  const { time, dateStr, mounted } = useClock();
+function useCartCount() {
+  const [count, setCount] = useState(0);
 
-  const scrollTo = (id: string) => {
-    // simplified scrollTo for now since lenis handles smooth scrolling via anchor natively
-    // but the prompt asked for a specific helper. I'll implement a basic one:
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-    }
-  };
+  useEffect(() => {
+    const load = () => {
+      try {
+        const cart = JSON.parse(localStorage.getItem("nexus_cart") || "[]");
+        setCount(Array.isArray(cart) ? cart.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) : 0);
+      } catch {
+        setCount(0);
+      }
+    };
+    load();
+    window.addEventListener("cart-updated", load);
+    return () => window.removeEventListener("cart-updated", load);
+  }, []);
+
+  return count;
+}
+
+const NAV_LINKS = [
+  { label: "Home", href: "/" },
+  { label: "Shop", href: "/shop" },
+  { label: "New Arrivals", href: "/shop?sort=newest" },
+];
+
+export function Header() {
+  const { ready, setIsMenuOpen, currentUser, setCurrentUser, setAuthView, setIsAuthModalOpen } = useAppState();
+  const cartCount = useCartCount();
 
   return (
     <AnimatePresence>
@@ -57,8 +73,8 @@ export function Header() {
         >
           <div className="shell grid grid-cols-[auto_1fr] items-center gap-[1rem] p-[1.25rem] sm:px-[2rem] sm:py-[1.5rem] lg:grid-cols-[1fr_auto_1fr]">
             {/* Left — Logo */}
-            <button onClick={() => scrollTo("home")} className="group outline-none">
-              <motion.span 
+            <a href="/" className="group outline-none">
+              <motion.span
                 className="flex items-center gap-[0.75rem]"
                 whileHover="hover"
                 variants={{ hover: { scale: 1.04, transition: { type: "spring", stiffness: 320, damping: 18 } } }}
@@ -66,48 +82,21 @@ export function Header() {
                 <img src="/Logo/Logo with out Text.png" alt="NexusCart" className="h-12 w-auto object-contain" />
                 <span className="text-[1.125rem] font-semibold tracking-[-.01em]">NexusCart</span>
               </motion.span>
-            </button>
+            </a>
 
             {/* Center — Nav links (truly centered on large screens) */}
             <ul className="hidden lg:flex justify-self-center gap-[2rem] text-[0.875rem] font-medium">
-              {[
-                { label: "Home", id: "home" },
-                { label: "Platform", id: "platform" },
-                { label: "Services", id: "services", dropdown: true },
-                { label: "About", id: "about" },
-                { label: "Shop", href: "/shop" },
-                { label: "Contact", modal: true }
-              ].map((item, i) => (
+              {NAV_LINKS.map((item, i) => (
                 <li key={i}>
-                  {item.href ? (
-                    <a
-                      href={item.href}
-                      className="group outline-none flex items-center gap-1"
+                  <a href={item.href} className="group outline-none flex items-center gap-1" aria-current={item.href === "/" ? "page" : undefined}>
+                    <motion.span
+                      whileHover="hover"
+                      variants={{ hover: { y: -2, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 22 } } }}
+                      className="opacity-80 transition-opacity"
                     >
-                      <motion.span
-                        whileHover="hover"
-                        variants={{ hover: { y: -2, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 22 } } }}
-                        className="opacity-80 transition-opacity"
-                      >
-                        {item.label}
-                      </motion.span>
-                    </a>
-                  ) : (
-                    <button 
-                      onClick={() => item.modal ? setIsModalOpen(true) : scrollTo(item.id as string)}
-                      className="group outline-none flex items-center gap-1"
-                      aria-current={item.label === "Home" ? "page" : undefined}
-                    >
-                      <motion.span
-                        whileHover="hover"
-                        variants={{ hover: { y: -2, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 22 } } }}
-                        className="opacity-80 transition-opacity"
-                      >
-                        {item.label}
-                      </motion.span>
-                      {item.dropdown && <span className="text-[0.75rem] opacity-60">▾</span>}
-                    </button>
-                  )}
+                      {item.label}
+                    </motion.span>
+                  </a>
                 </li>
               ))}
             </ul>
@@ -122,8 +111,28 @@ export function Header() {
                 <span>Search products...</span>
               </a>
 
+              <a
+                href="/cart"
+                className="relative grid h-[2.5rem] w-[2.5rem] place-items-center rounded-[0.875rem] border border-[rgba(230,229,226,0.8)] bg-[rgba(255,255,255,0.4)] text-[rgba(17,17,17,0.7)] backdrop-blur-[4px] transition-colors hover:bg-[rgba(255,255,255,0.7)] hover:text-[#111]"
+                aria-label="Cart"
+              >
+                <ShoppingBag className="h-[1.125rem] w-[1.125rem]" />
+                {cartCount > 0 && (
+                  <span className="absolute -right-[0.25rem] -top-[0.25rem] grid h-[1.125rem] min-w-[1.125rem] place-items-center rounded-[9999px] bg-[var(--color-accent)] px-[0.25rem] text-[0.625rem] font-semibold text-white">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
+              </a>
+
               {currentUser ? (
                 <div className="hidden lg:flex items-center gap-[0.75rem]">
+                  <a
+                    href="/profile"
+                    className="flex items-center gap-[0.375rem] rounded-[0.875rem] bg-[rgba(241,240,238,0.6)] px-[0.75rem] py-[0.5rem] text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)] transition-colors hover:bg-[rgba(17,17,17,0.1)]"
+                  >
+                    <UserIcon className="h-3.5 w-3.5" />
+                    {currentUser.name}
+                  </a>
                   {currentUser.role === "Admin" && (
                     <a
                       href="/admin"
@@ -132,10 +141,7 @@ export function Header() {
                       Admin
                     </a>
                   )}
-                  <div className="text-[0.75rem] font-medium text-[rgba(17,17,17,0.7)]">
-                    {currentUser.name} ({currentUser.role})
-                  </div>
-                  <button 
+                  <button
                     onClick={() => {
                       setCurrentUser(null);
                       localStorage.removeItem('nexus_user');
@@ -148,7 +154,7 @@ export function Header() {
                   </button>
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={() => {
                     setAuthView('login');
                     setIsAuthModalOpen(true);
@@ -159,16 +165,16 @@ export function Header() {
                 </button>
               )}
 
-              <button 
+              <button
                 onClick={() => setIsMenuOpen(true)}
                 className="group rounded-[0.875rem] border border-[rgba(230,229,226,0.8)] bg-[rgba(255,255,255,0.4)] backdrop-blur-[4px] transition-colors hover:bg-[rgba(255,255,255,0.7)] outline-none"
               >
-                <motion.span 
+                <motion.span
                   className="flex items-center gap-[0.5rem] px-[1rem] py-[0.5rem] text-[0.75rem] font-medium uppercase tracking-[.05em]"
                   whileHover="hover"
                   variants={{ hover: { scale: 1.05, transition: { type: "spring", stiffness: 320, damping: 18 } } }}
                 >
-                  <Grid className="h-[0.875rem] w-[0.875rem]" />
+                  <Menu className="h-[0.875rem] w-[0.875rem]" />
                   <span className="hidden sm:inline">Menu</span>
                 </motion.span>
               </button>
@@ -181,7 +187,7 @@ export function Header() {
 }
 
 export function NavMenu() {
-  const { isMenuOpen, setIsMenuOpen, setIsModalOpen } = useAppState();
+  const { isMenuOpen, setIsMenuOpen, setIsModalOpen, currentUser, setAuthView, setIsAuthModalOpen } = useAppState();
   const { time } = useClock();
 
   useEffect(() => {
@@ -192,27 +198,28 @@ export function NavMenu() {
     return () => window.removeEventListener("keydown", handleEsc);
   }, [isMenuOpen, setIsMenuOpen]);
 
-  const handleLink = (target: "modal" | string, href?: string) => {
+  const navigate = (href: string) => {
     setIsMenuOpen(false);
-    if (href) {
-      setTimeout(() => { window.location.href = href; }, 300);
-    } else if (target === "modal") {
-      setTimeout(() => setIsModalOpen(true), 300);
-    } else {
-      setTimeout(() => {
-        const el = document.getElementById(target);
-        if (el) el.scrollIntoView({ behavior: "smooth" });
-      }, 300);
-    }
+    setTimeout(() => { window.location.href = href; }, 300);
   };
 
-  const navItems = [
-    { label: "Home", id: "home" },
-    { label: "Platform", id: "platform" },
-    { label: "Services", id: "services" },
-    { label: "About", id: "about" },
-    { label: "Shop", href: "/shop" },
-    { label: "Contact", modal: true }
+  const openAuth = () => {
+    setIsMenuOpen(false);
+    setTimeout(() => {
+      setAuthView('login');
+      setIsAuthModalOpen(true);
+    }, 300);
+  };
+
+  const navItems: { label: string; onClick: () => void }[] = [
+    { label: "Home", onClick: () => navigate("/") },
+    { label: "Shop", onClick: () => navigate("/shop") },
+    { label: "New Arrivals", onClick: () => navigate("/shop?sort=newest") },
+    { label: "Cart", onClick: () => navigate("/cart") },
+    currentUser
+      ? { label: "My Orders", onClick: () => navigate("/profile") }
+      : { label: "Sign In", onClick: openAuth },
+    ...(currentUser?.role === "Admin" ? [{ label: "Admin", onClick: () => navigate("/admin") }] : []),
   ];
 
   return (
@@ -231,7 +238,7 @@ export function NavMenu() {
               <img src="/Logo/Logo with out Text.png" alt="NexusCart" className="h-12 w-auto object-contain invert" />
               <span className="text-[1.125rem] font-semibold tracking-[-.01em]">NexusCart</span>
             </div>
-            <button 
+            <button
               onClick={() => setIsMenuOpen(false)}
               className="inline-flex items-center gap-[0.5rem] rounded-[0.875rem] border border-[rgba(255,255,255,0.15)] px-[1rem] py-[0.5rem] text-[0.75rem] font-medium uppercase tracking-[.05em] text-[rgba(255,255,255,0.7)] transition-colors hover:border-[rgba(255,255,255,0.4)] hover:text-[#fff]"
             >
@@ -249,7 +256,7 @@ export function NavMenu() {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: "1rem", opacity: 0 }}
                     transition={{ delay: (i * 45 + 80) / 1000, duration: 0.5, ease: "easeOut" }}
-                    onClick={() => handleLink(item.modal ? "modal" : (item.id || ""), item.href)}
+                    onClick={item.onClick}
                     className="group flex w-full items-center gap-[1rem] py-[0.5rem] text-left text-[2.25rem] font-semibold tracking-[-.02em] sm:text-[3.75rem]"
                   >
                     <span className="text-[1rem] font-normal text-[rgba(255,255,255,0.3)] transition-colors group-hover:text-[var(--color-accent-from)]">
@@ -267,11 +274,11 @@ export function NavMenu() {
           {/* Bottom bar */}
           <div className="shell flex flex-col gap-[0.75rem] border-t border-[rgba(255,255,255,0.1)] px-[1.25rem] py-[1.5rem] text-[0.75rem] uppercase tracking-[.025em] text-[rgba(255,255,255,0.45)] sm:flex-row sm:justify-between sm:px-[2rem] w-full">
             <span>Local time — {time}</span>
-            <button 
-              onClick={() => handleLink("modal")}
+            <button
+              onClick={() => { setIsMenuOpen(false); setTimeout(() => setIsModalOpen(true), 300); }}
               className="text-left text-[rgba(255,255,255,0.7)] hover:text-[#fff] hover:underline sm:text-right"
             >
-              Start a project →
+              Contact us →
             </button>
           </div>
         </motion.div>

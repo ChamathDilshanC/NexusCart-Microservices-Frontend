@@ -1,32 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --color-background: #ffffff;
   --color-foreground: #111111;
-  
+
   --color-ink: #0a0a0a;
   --color-muted: #8d8d8d;
   --color-subtle: #b6b6b6;
   --color-line: #e6e5e2;
   --color-surface: #f1f0ee;
   --color-surface-2: #e3e2df;
-  
+
   --color-accent: #b15f2c;
   --color-accent-from: #cf8047;
   --color-accent-to: #97501f;
-  
+
   --color-hero-from: #ecebe9;
   --color-hero-to: #c9c9c9;
 
-  --shop-bg: rgb(237, 239, 243);
-  --shop-accent: rgb(34, 211, 238);
-  --shop-accent-hover: rgb(20, 190, 216);
-  --shop-card-radius: 8px;
-  --shop-header-bg: rgb(10, 10, 10);
-  --shop-text: rgb(30, 30, 30);
-  --shop-text-muted: rgb(100, 100, 100);
-  
   --radius-pill: 9999px;
   --radius-card: 2rem;
   --radius-card-sm: 1.25rem;

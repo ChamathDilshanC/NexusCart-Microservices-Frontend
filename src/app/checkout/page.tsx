@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Header, NavMenu } from "@/components/Header";
-import { PillButton } from "@/components/Shared";
+import { PillButton, useAppState } from "@/components/Shared";
 import { ShoppingBag, Lock, ArrowLeft } from "lucide-react";
 
 interface CartItem {
@@ -17,6 +17,7 @@ interface CartItem {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const { setAuthView, setIsAuthModalOpen } = useAppState();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -31,12 +32,14 @@ export default function CheckoutPage() {
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem("nexus_cart") || "[]");
     setItems(cart);
-    // Redirect to login if not authenticated
+    // Prompt sign-in (rather than a silent redirect) if not authenticated
     const token = localStorage.getItem("nexus_token");
     if (!token) {
+      setAuthView("login");
+      setIsAuthModalOpen(true);
       router.push("/");
     }
-  }, [router]);
+  }, [router, setAuthView, setIsAuthModalOpen]);
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 50 ? 0 : 5.99;

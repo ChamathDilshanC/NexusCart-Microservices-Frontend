@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState } from "react";
-import { ArrowRight, ArrowUpRight } from "./Icons";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -182,6 +182,91 @@ export const TagChip = ({ children, tone = "dark", className }: { children: Reac
     )}>
       {children}
     </div>
+  );
+};
+
+// ProductCard — shared across FeaturedProducts / related-products grids
+export interface ProductCardData {
+  _id: string;
+  name: string;
+  price: number;
+  category?: string;
+  imageUrl?: string;
+  stock: number;
+  isFeatured?: boolean;
+}
+
+export const ProductCard = ({ product, index = 0 }: { product: ProductCardData, index?: number }) => {
+  return (
+    <motion.a
+      href={`/product/${product._id}`}
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.08, type: "spring", stiffness: 200, damping: 24 }}
+      whileHover={{ y: -6, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+      className="group flex flex-col overflow-hidden rounded-[1.5rem] border border-[var(--color-line)] bg-[#fff] transition-shadow hover:shadow-lg"
+    >
+      <div className="relative aspect-square overflow-hidden bg-[rgba(241,240,238,0.5)]">
+        {product.imageUrl ? (
+          <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <ArrowUpRight className="h-12 w-12 text-[rgba(17,17,17,0.15)]" />
+          </div>
+        )}
+        {product.stock <= 0 && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(0,0,0,0.4)]">
+            <span className="rounded-full bg-[#fff] px-[1rem] py-[0.375rem] text-[0.75rem] font-semibold text-[#111]">Out of Stock</span>
+          </div>
+        )}
+        {product.isFeatured && (
+          <span className="absolute right-[0.625rem] top-[0.625rem] rounded-[6px] bg-gradient-to-r from-[var(--color-accent-from)] to-[var(--color-accent-to)] px-[0.5rem] py-[0.25rem] text-[0.6rem] font-bold uppercase tracking-wider text-white">
+            Featured
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-[0.5rem] p-[1.25rem]">
+        {product.category && (
+          <span className="text-[0.7rem] font-medium uppercase tracking-wider text-[rgba(17,17,17,0.4)]">{product.category}</span>
+        )}
+        <h3 className="text-[1rem] font-medium leading-snug text-[#111] line-clamp-2">{product.name}</h3>
+        <div className="mt-auto flex items-center justify-between pt-[0.5rem]">
+          <span className="text-[1.125rem] font-semibold text-[#111]">${Number(product.price).toFixed(2)}</span>
+          {product.stock > 0 && (
+            <span className="text-[0.7rem] font-medium text-green-600">In Stock</span>
+          )}
+        </div>
+      </div>
+    </motion.a>
+  );
+};
+
+// StatusPill — order-status badges (profile, admin)
+export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger";
+
+const STATUS_TONE_CLASSES: Record<StatusTone, string> = {
+  neutral: "bg-[rgba(17,17,17,0.05)] text-[rgba(17,17,17,0.6)]",
+  info: "bg-blue-50 text-blue-600",
+  success: "bg-green-50 text-green-600",
+  warning: "bg-yellow-50 text-yellow-600",
+  danger: "bg-red-50 text-red-600",
+};
+
+export const ORDER_STATUS_TONES: Record<string, StatusTone> = {
+  PENDING: "warning",
+  PAID: "info",
+  SHIPPED: "neutral",
+  DELIVERED: "success",
+  CANCELLED: "danger",
+};
+
+export const StatusPill = ({ children, tone = "neutral", icon, className }: { children: React.ReactNode, tone?: StatusTone, icon?: React.ReactNode, className?: string }) => {
+  return (
+    <span className={cn("inline-flex items-center gap-[0.25rem] rounded-full px-[0.75rem] py-[0.25rem] text-[0.7rem] font-medium", STATUS_TONE_CLASSES[tone], className)}>
+      {icon}
+      {children}
+    </span>
   );
 };
 

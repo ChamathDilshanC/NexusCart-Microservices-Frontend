@@ -7,12 +7,14 @@ interface ScrollContextType {
   lenis: Lenis | null;
   stopScroll: () => void;
   startScroll: () => void;
+  scrollTo: (target: string | number) => void;
 }
 
 const ScrollContext = createContext<ScrollContextType>({
   lenis: null,
   stopScroll: () => {},
   startScroll: () => {},
+  scrollTo: () => {},
 });
 
 export const useScroll = () => useContext(ScrollContext);
@@ -61,8 +63,21 @@ export function ScrollProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const scrollTo = (target: string | number) => {
+    if (lenis) {
+      lenis.scrollTo(target, { duration: 1.2 });
+      return;
+    }
+    if (typeof target === "string") {
+      const el = document.getElementById(target);
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: target, behavior: "smooth" });
+    }
+  };
+
   return (
-    <ScrollContext.Provider value={{ lenis, stopScroll, startScroll }}>
+    <ScrollContext.Provider value={{ lenis, stopScroll, startScroll, scrollTo }}>
       {children}
     </ScrollContext.Provider>
   );
