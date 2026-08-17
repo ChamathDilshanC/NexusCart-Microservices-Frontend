@@ -55,8 +55,8 @@ export function Header() {
           transition={{ type: "spring", stiffness: 210, damping: 26, delay: 0.15 }}
           className="absolute inset-x-0 top-0 z-50"
         >
-          <div className="shell flex items-center justify-between gap-[1.5rem] p-[1.25rem] sm:px-[2rem] sm:py-[1.5rem]">
-            {/* Left */}
+          <div className="shell grid grid-cols-[auto_1fr] items-center gap-[1rem] p-[1.25rem] sm:px-[2rem] sm:py-[1.5rem] lg:grid-cols-[1fr_auto_1fr]">
+            {/* Left — Logo */}
             <button onClick={() => scrollTo("home")} className="group outline-none">
               <motion.span 
                 className="flex items-center gap-[0.75rem]"
@@ -68,8 +68,8 @@ export function Header() {
               </motion.span>
             </button>
 
-            {/* Center */}
-            <ul className="hidden lg:flex gap-[2rem] text-[0.875rem] font-medium">
+            {/* Center — Nav links (truly centered on large screens) */}
+            <ul className="hidden lg:flex justify-self-center gap-[2rem] text-[0.875rem] font-medium">
               {[
                 { label: "Home", id: "home" },
                 { label: "Platform", id: "platform" },
@@ -113,7 +113,7 @@ export function Header() {
             </ul>
 
             {/* Right */}
-            <div className="flex items-center gap-[0.75rem]">
+            <div className="flex items-center gap-[0.75rem] justify-self-end">
               <a
                 href="/shop"
                 className="hidden md:flex items-center gap-[0.5rem] rounded-[0.875rem] border border-[rgba(230,229,226,0.8)] bg-[rgba(255,255,255,0.4)] px-[0.75rem] py-[0.5rem] text-[0.75rem] text-[rgba(17,17,17,0.5)] backdrop-blur-[4px] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
