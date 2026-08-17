@@ -2,16 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
 import { Header, NavMenu } from "@/components/Header";
 import { Footer } from "@/components/Sections";
 import { AuthModal } from "@/components/AuthModal";
-import { PillButton } from "@/components/Shared";
-import { ShoppingBag, ArrowLeft, Minus, Plus, Check, Truck, Shield, RefreshCw } from "lucide-react";
+import {
+  ShoppingBag, ChevronRight, Minus, Plus, ShoppingCart,
+  Truck, Shield, RefreshCw, Check, Home, Package
+} from "lucide-react";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const [product, setProduct] = useState<any>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -21,12 +23,27 @@ export default function ProductDetailPage() {
     if (!params.id) return;
     fetch(`/api/products/${params.id}`)
       .then((r) => r.json())
-      .then((data) => { if (data._id) setProduct(data); })
+      .then((data) => {
+        if (data._id) {
+          setProduct(data);
+          // Fetch related products from same category
+          fetch(`/api/products?category=${encodeURIComponent(data.category)}`)
+            .then((r) => r.json())
+            .then((arr) => {
+              if (Array.isArray(arr)) {
+                setRelatedProducts(arr.filter((p: any) => p._id !== data._id).slice(0, 4));
+              }
+            })
+            .catch(() => {});
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [params.id]);
 
-  const allImages = product ? [product.imageUrl, ...(product.images || [])].filter(Boolean) : [];
+  const allImages = product
+    ? [product.imageUrl, ...(product.images || [])].filter(Boolean)
+    : [];
 
   const addToCart = () => {
     if (!product) return;
@@ -43,12 +60,17 @@ export default function ProductDetailPage() {
     setTimeout(() => setAdded(false), 2000);
   };
 
+  const shopFont = "'Red Hat Display', sans-serif";
+
   if (loading) {
     return (
       <>
         <Header />
-        <main className="flex min-h-screen items-center justify-center bg-[#fff]">
-          <div className="text-[rgba(17,17,17,0.4)] text-[0.875rem]">Loading product...</div>
+        <main className="flex min-h-screen items-center justify-center" style={{ background: "var(--shop-bg)" }}>
+          <div className="flex flex-col items-center gap-[0.75rem]">
+            <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[rgba(0,0,0,0.1)] border-t-[var(--shop-accent)]" />
+            <span className="text-[0.875rem] text-[var(--shop-text-muted)]" style={{ fontFamily: shopFont }}>Loading product...</span>
+          </div>
         </main>
       </>
     );
@@ -59,10 +81,12 @@ export default function ProductDetailPage() {
       <>
         <Header />
         <NavMenu />
-        <main className="flex min-h-screen flex-col items-center justify-center gap-[1rem] bg-[#fff]">
-          <ShoppingBag className="h-12 w-12 text-[rgba(17,17,17,0.15)]" />
-          <div className="text-[rgba(17,17,17,0.4)] text-[0.875rem]">Product not found.</div>
-          <a href="/shop" className="text-[0.875rem] font-medium text-[#111] underline underline-offset-2">Back to shop</a>
+        <main className="flex min-h-screen flex-col items-center justify-center gap-[1rem]" style={{ background: "var(--shop-bg)", fontFamily: shopFont }}>
+          <ShoppingBag className="h-16 w-16 text-[rgba(0,0,0,0.1)]" />
+          <p className="text-[1rem] font-medium text-[var(--shop-text)]">Product not found</p>
+          <a href="/shop" className="text-[0.875rem] font-medium underline underline-offset-2" style={{ color: "var(--shop-accent)" }}>
+            Back to shop
+          </a>
         </main>
         <Footer />
       </>
@@ -75,100 +99,224 @@ export default function ProductDetailPage() {
       <NavMenu />
       <AuthModal />
 
-      <main className="min-h-screen bg-[#fff]">
-        <div className="shell px-[1.25rem] pt-[8rem] pb-[5rem] sm:px-[2rem] lg:pb-[7rem]">
-          {/* Back link */}
-          <a href="/shop" className="mb-[2rem] inline-flex items-center gap-[0.5rem] text-[0.875rem] text-[rgba(17,17,17,0.5)] transition-colors hover:text-[#111]">
-            <ArrowLeft className="h-4 w-4" /> Back to shop
-          </a>
+      <main className="min-h-screen" style={{ background: "var(--shop-bg)", fontFamily: shopFont }}>
+        {/* Breadcrumb */}
+        <div className="border-b border-[rgba(0,0,0,0.08)] bg-[#fff]">
+          <div className="shell flex flex-wrap items-center gap-[0.5rem] px-[1.25rem] py-[0.875rem] text-[0.8125rem] sm:px-[2rem]">
+            <a href="/" className="text-[var(--shop-text-muted)] hover:text-[var(--shop-text)] transition-colors">
+              <Home className="h-3.5 w-3.5" />
+            </a>
+            <ChevronRight className="h-3 w-3 text-[var(--shop-text-muted)]" />
+            <a href="/shop" className="text-[var(--shop-text-muted)] hover:text-[var(--shop-text)] transition-colors">Shop</a>
+            <ChevronRight className="h-3 w-3 text-[var(--shop-text-muted)]" />
+            <a href={`/shop?category=${encodeURIComponent(product.category)}`} className="text-[var(--shop-text-muted)] hover:text-[var(--shop-text)] transition-colors">
+              {product.category}
+            </a>
+            <ChevronRight className="h-3 w-3 text-[var(--shop-text-muted)]" />
+            <span className="font-medium text-[var(--shop-text)] line-clamp-1">{product.name}</span>
+          </div>
+        </div>
 
-          <div className="grid grid-cols-1 gap-[3rem] lg:grid-cols-2 lg:gap-[5rem]">
-            {/* Images */}
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} className="flex flex-col gap-[1rem]">
-              <div className="aspect-square overflow-hidden rounded-[2rem] bg-[rgba(241,240,238,0.5)]">
-                {allImages.length > 0 ? (
-                  <img src={allImages[activeImage]} alt={product.name} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <ShoppingBag className="h-20 w-20 text-[rgba(17,17,17,0.1)]" />
+        {/* Product section */}
+        <div className="shell px-[1.25rem] py-[2rem] sm:px-[2rem] lg:py-[3rem]">
+          <div className="rounded-[12px] bg-[#fff] p-[1.5rem] shadow-[0_1px_3px_rgba(0,0,0,0.04)] sm:p-[2rem] lg:p-[2.5rem]">
+            <div className="grid grid-cols-1 gap-[2rem] lg:grid-cols-2 lg:gap-[3rem]">
+              {/* Image Gallery */}
+              <div className="flex flex-col gap-[0.75rem]">
+                {/* Main image */}
+                <div className="aspect-square overflow-hidden rounded-[8px] bg-[var(--shop-bg)]">
+                  {allImages.length > 0 ? (
+                    <img
+                      src={allImages[activeImage]}
+                      alt={product.name}
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <ShoppingBag className="h-20 w-20 text-[rgba(0,0,0,0.08)]" />
+                    </div>
+                  )}
+                </div>
+                {/* Thumbnails */}
+                {allImages.length > 1 && (
+                  <div className="flex gap-[0.5rem] overflow-x-auto pb-[0.25rem]">
+                    {allImages.map((img: string, i: number) => (
+                      <button
+                        key={i}
+                        onClick={() => setActiveImage(i)}
+                        className={`h-[3.5rem] w-[3.5rem] shrink-0 overflow-hidden rounded-[6px] border-2 transition-colors ${
+                          i === activeImage ? "border-[var(--shop-accent)]" : "border-[rgba(0,0,0,0.08)]"
+                        }`}
+                      >
+                        <img src={img} alt="" className="h-full w-full object-cover" />
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
-              {allImages.length > 1 && (
-                <div className="flex gap-[0.75rem]">
-                  {allImages.map((img: string, i: number) => (
+
+              {/* Product Info */}
+              <div className="flex flex-col">
+                {/* Category */}
+                <a
+                  href={`/shop?category=${encodeURIComponent(product.category)}`}
+                  className="inline-flex w-fit rounded-[4px] px-[0.625rem] py-[0.25rem] text-[0.7rem] font-semibold uppercase tracking-wider transition-colors hover:opacity-80"
+                  style={{ background: "var(--shop-accent)", color: "var(--shop-header-bg)" }}
+                >
+                  {product.category}
+                </a>
+
+                {/* Name */}
+                <h1 className="mt-[0.75rem] text-[1.5rem] font-bold leading-tight text-[var(--shop-text)] sm:text-[1.875rem]">
+                  {product.name}
+                </h1>
+
+                {/* Price */}
+                <div className="mt-[1rem] text-[2rem] font-bold text-[var(--shop-text)]">
+                  ${Number(product.price).toFixed(2)}
+                </div>
+
+                {/* Stock badge */}
+                <div className="mt-[1rem] flex items-center gap-[0.5rem]">
+                  {product.stock > 0 ? (
+                    <span className="inline-flex items-center gap-[0.375rem] rounded-[6px] bg-[#dcfce7] px-[0.75rem] py-[0.375rem] text-[0.75rem] font-semibold text-[#166534]">
+                      <Check className="h-3.5 w-3.5" /> In Stock ({product.stock} available)
+                    </span>
+                  ) : (
+                    <span className="rounded-[6px] bg-[#fee2e2] px-[0.75rem] py-[0.375rem] text-[0.75rem] font-semibold text-[#991b1b]">
+                      Out of Stock
+                    </span>
+                  )}
+                  {product.isFeatured && (
+                    <span className="rounded-[6px] px-[0.75rem] py-[0.375rem] text-[0.75rem] font-semibold text-white" style={{ background: "var(--shop-accent)" }}>
+                      Featured
+                    </span>
+                  )}
+                </div>
+
+                {/* Description */}
+                <p className="mt-[1.5rem] text-[0.9375rem] leading-relaxed text-[var(--shop-text-muted)]">
+                  {product.description}
+                </p>
+
+                {/* Quantity + Add to Cart */}
+                {product.stock > 0 && (
+                  <div className="mt-[2rem] flex items-center gap-[0.75rem]">
+                    <div className="flex items-center rounded-[8px] border border-[rgba(0,0,0,0.12)]">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="px-[0.75rem] py-[0.625rem] text-[var(--shop-text-muted)] hover:text-[var(--shop-text)]"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="min-w-[2.5rem] text-center text-[0.875rem] font-semibold text-[var(--shop-text)]">
+                        {quantity}
+                      </span>
+                      <button
+                        onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                        className="px-[0.75rem] py-[0.625rem] text-[var(--shop-text-muted)] hover:text-[var(--shop-text)]"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
                     <button
-                      key={i}
-                      onClick={() => setActiveImage(i)}
-                      className={`h-[4rem] w-[4rem] overflow-hidden rounded-[0.75rem] border-2 transition-colors ${i === activeImage ? "border-[#111]" : "border-transparent"}`}
+                      onClick={addToCart}
+                      className="flex flex-1 items-center justify-center gap-[0.5rem] rounded-[8px] py-[0.75rem] text-[0.875rem] font-bold text-[var(--shop-header-bg)] transition-all hover:brightness-110 active:scale-[0.98]"
+                      style={{ background: "var(--shop-accent)" }}
                     >
-                      <img src={img} alt="" className="h-full w-full object-cover" />
+                      <ShoppingCart className="h-4 w-4" />
+                      {added ? "Added to Cart!" : `Add to Cart — $${(product.price * quantity).toFixed(2)}`}
                     </button>
-                  ))}
+                  </div>
+                )}
+
+                {/* Specs Table */}
+                <div className="mt-[2rem] overflow-hidden rounded-[8px] border border-[rgba(0,0,0,0.08)]">
+                  <table className="w-full text-[0.8125rem]">
+                    <tbody>
+                      {[
+                        { label: "Category", value: product.category },
+                        { label: "Availability", value: product.stock > 0 ? `In Stock (${product.stock})` : "Out of Stock" },
+                        { label: "Product ID", value: product._id?.slice(-8) || "—" },
+                      ].map((row, i) => (
+                        <tr key={i} className={i % 2 === 0 ? "bg-[var(--shop-bg)]" : "bg-[#fff]"}>
+                          <td className="px-[1rem] py-[0.625rem] font-semibold text-[var(--shop-text)]">{row.label}</td>
+                          <td className="px-[1rem] py-[0.625rem] text-[var(--shop-text-muted)]">{row.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </motion.div>
-
-            {/* Product Info */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className="flex flex-col">
-              <span className="text-[0.8rem] font-medium uppercase tracking-wider text-[rgba(17,17,17,0.4)]">{product.category}</span>
-              <h1 className="mt-[0.75rem] text-[2rem] font-semibold tracking-[-.02em] sm:text-[2.5rem]">{product.name}</h1>
-              <div className="mt-[1rem] text-[2rem] font-semibold text-[#111]">${Number(product.price).toFixed(2)}</div>
-
-              <div className="mt-[1.5rem] flex items-center gap-[0.75rem]">
-                {product.stock > 0 ? (
-                  <span className="inline-flex items-center gap-[0.375rem] rounded-full bg-green-50 px-[0.75rem] py-[0.25rem] text-[0.8rem] font-medium text-green-700">
-                    <Check className="h-3.5 w-3.5" /> In Stock ({product.stock} available)
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full bg-red-50 px-[0.75rem] py-[0.25rem] text-[0.8rem] font-medium text-red-600">
-                    Out of Stock
-                  </span>
-                )}
-                {product.isFeatured && (
-                  <span className="rounded-full bg-[rgba(17,17,17,0.05)] px-[0.75rem] py-[0.25rem] text-[0.8rem] font-medium text-[rgba(17,17,17,0.6)]">
-                    Featured
-                  </span>
-                )}
               </div>
+            </div>
+          </div>
 
-              <p className="mt-[2rem] text-[0.9375rem] leading-relaxed text-[rgba(17,17,17,0.6)]">
-                {product.description}
-              </p>
-
-              {/* Quantity + Add to Cart */}
-              {product.stock > 0 && (
-                <div className="mt-[2.5rem] flex items-center gap-[1rem]">
-                  <div className="flex items-center rounded-[1rem] border border-[var(--color-line)]">
-                    <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-[0.75rem] py-[0.625rem] text-[rgba(17,17,17,0.5)] hover:text-[#111]">
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="min-w-[2.5rem] text-center text-[0.875rem] font-medium">{quantity}</span>
-                    <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="px-[0.75rem] py-[0.625rem] text-[rgba(17,17,17,0.5)] hover:text-[#111]">
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <PillButton variant="dark" onClick={addToCart} className="flex-1 justify-center">
-                    {added ? "Added!" : `Add to Cart — $${(product.price * quantity).toFixed(2)}`}
-                  </PillButton>
+          {/* Trust badges */}
+          <div className="mt-[1.5rem] grid grid-cols-1 gap-[0.75rem] sm:grid-cols-3">
+            {[
+              { icon: <Truck className="h-6 w-6" />, title: "Free Shipping", desc: "On orders over $50" },
+              { icon: <Shield className="h-6 w-6" />, title: "Secure Payment", desc: "100% protected transactions" },
+              { icon: <RefreshCw className="h-6 w-6" />, title: "Easy Returns", desc: "30-day return policy" },
+            ].map((badge, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-[1rem] rounded-[8px] bg-[#fff] p-[1.25rem] shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+              >
+                <div className="flex h-[2.75rem] w-[2.75rem] shrink-0 items-center justify-center rounded-[8px]" style={{ background: "var(--shop-bg)" }}>
+                  <span style={{ color: "var(--shop-accent)" }}>{badge.icon}</span>
                 </div>
-              )}
+                <div>
+                  <div className="text-[0.875rem] font-semibold text-[var(--shop-text)]">{badge.title}</div>
+                  <div className="text-[0.75rem] text-[var(--shop-text-muted)]">{badge.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
 
-              {/* Trust badges */}
-              <div className="mt-[3rem] grid grid-cols-3 gap-[1rem] border-t border-[var(--color-line)] pt-[2rem]">
-                {[
-                  { icon: <Truck className="h-5 w-5" />, text: "Free shipping" },
-                  { icon: <Shield className="h-5 w-5" />, text: "Secure payment" },
-                  { icon: <RefreshCw className="h-5 w-5" />, text: "Easy returns" },
-                ].map((b, i) => (
-                  <div key={i} className="flex flex-col items-center gap-[0.5rem] text-center">
-                    <span className="text-[rgba(17,17,17,0.3)]">{b.icon}</span>
-                    <span className="text-[0.75rem] text-[rgba(17,17,17,0.5)]">{b.text}</span>
-                  </div>
+          {/* Related Products */}
+          {relatedProducts.length > 0 && (
+            <div className="mt-[3rem]">
+              <h2 className="mb-[1.25rem] text-[1.25rem] font-bold text-[var(--shop-text)]">Related Products</h2>
+              <div className="grid grid-cols-2 gap-[0.5rem] sm:grid-cols-3 lg:grid-cols-4">
+                {relatedProducts.map((p: any) => (
+                  <a
+                    key={p._id}
+                    href={`/product/${p._id}`}
+                    className="group flex flex-col overflow-hidden bg-[#fff] transition-all duration-200 hover:-translate-y-[2px] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
+                    style={{ borderRadius: "var(--shop-card-radius)" }}
+                  >
+                    <div className="relative aspect-square overflow-hidden bg-[var(--shop-bg)]">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <Package className="h-10 w-10 text-[rgba(0,0,0,0.1)]" />
+                        </div>
+                      )}
+                      {p.stock > 0 ? (
+                        <span className="absolute left-[0.5rem] top-[0.5rem] inline-flex items-center gap-[0.25rem] rounded-[4px] bg-[#22c55e] px-[0.375rem] py-[0.125rem] text-[0.6rem] font-semibold uppercase text-white">
+                          <Check className="h-2.5 w-2.5" /> In Stock
+                        </span>
+                      ) : (
+                        <span className="absolute left-[0.5rem] top-[0.5rem] rounded-[4px] bg-[#ef4444] px-[0.375rem] py-[0.125rem] text-[0.6rem] font-semibold uppercase text-white">
+                          Out of Stock
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col p-[0.75rem]">
+                      <span className="text-[0.6rem] font-medium uppercase tracking-wider text-[var(--shop-text-muted)]">{p.category}</span>
+                      <span className="mt-[0.125rem] text-[0.8125rem] font-medium leading-snug text-[var(--shop-text)] line-clamp-2 group-hover:underline">
+                        {p.name}
+                      </span>
+                      <span className="mt-auto pt-[0.5rem] text-[1rem] font-bold text-[var(--shop-text)]">
+                        ${Number(p.price).toFixed(2)}
+                      </span>
+                    </div>
+                  </a>
                 ))}
               </div>
-            </motion.div>
-          </div>
+            </div>
+          )}
         </div>
       </main>
 

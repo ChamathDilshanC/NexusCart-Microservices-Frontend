@@ -4,15 +4,28 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppState, PillButton } from "./Shared";
 import { LiquidRevealCanvas } from "./Hero";
-import { Package, ShoppingBag, Users, Plus, Pencil, Trash2, ChevronDown, X, BarChart3 } from "lucide-react";
+import {
+  Package, ShoppingBag, Users, Plus, Pencil, Trash2,
+  ChevronDown, X, Upload, Link2, Image as ImageIcon, GripVertical
+} from "lucide-react";
 import { goeyToast } from "goey-toast";
 
 type Tab = "products" | "orders" | "users";
+type ImageMode = "url" | "upload";
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
   Authorization: `Bearer ${localStorage.getItem("nexus_token")}`,
 });
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+}
 
 export function AdminDashboard() {
   const { ready } = useAppState();
@@ -24,7 +37,14 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", description: "", price: "", stock: "", category: "", imageUrl: "", isFeatured: false });
+  const [form, setForm] = useState({
+    name: "", description: "", price: "", stock: "", category: "",
+    imageUrl: "", images: [] as string[], isFeatured: false
+  });
+
+  // Image upload state
+  const [primaryMode, setPrimaryMode] = useState<ImageMode>("url");
+  const [additionalModes, setAdditionalModes] = useState<ImageMode[]>([]);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -60,14 +80,24 @@ export function AdminDashboard() {
   }, [fetchProducts, fetchOrders, fetchUsers, fetchMetrics]);
 
   const resetForm = () => {
-    setForm({ name: "", description: "", price: "", stock: "", category: "", imageUrl: "", isFeatured: false });
+    setForm({ name: "", description: "", price: "", stock: "", category: "", imageUrl: "", images: [], isFeatured: false });
+    setPrimaryMode("url");
+    setAdditionalModes([]);
     setEditing(null);
     setShowForm(false);
   };
 
   const openEdit = (p: any) => {
     setEditing(p);
-    setForm({ name: p.name, description: p.description, price: String(p.price), stock: String(p.stock), category: p.category, imageUrl: p.imageUrl || "", isFeatured: p.isFeatured || false });
+    const imgs = p.images || [];
+    setForm({
+      name: p.name, description: p.description,
+      price: String(p.price), stock: String(p.stock),
+      category: p.category, imageUrl: p.imageUrl || "",
+      images: [...imgs], isFeatured: p.isFeatured || false
+    });
+    setPrimaryMode(p.imageUrl ? "url" : "url");
+    setAdditionalModes(imgs.map(() => "url" as ImageMode));
     setShowForm(true);
   };
 
@@ -101,12 +131,50 @@ export function AdminDashboard() {
   const handleStatusChange = async (orderId: string, status: string) => {
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify({ status }),
+        method: "PATCH", headers: authHeaders(), body: JSON.stringify({ status }),
       });
       if (res.ok) { goeyToast.success(`Order ${status}`); fetchOrders(); }
     } catch { goeyToast.error("Failed to update status"); }
+  };
+
+  const handlePrimaryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { goeyToast.error("Image must be under 5MB"); return; }
+    try {
+      const base64 = await fileToBase64(file);
+      setForm({ ...form, imageUrl: base64 });
+      goeyToast.success("Image uploaded");
+    } catch { goeyToast.error("Upload failed"); }
+  };
+
+  const handleAdditionalUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { goeyToast.error("Image must be under 5MB"); return; }
+    try {
+      const base64 = await fileToBase64(file);
+      const newImages = [...form.images];
+      newImages[index] = base64;
+      setForm({ ...form, images: newImages });
+      goeyToast.success("Image uploaded");
+    } catch { goeyToast.error("Upload failed"); }
+  };
+
+  const addAdditionalImage = () => {
+    setForm({ ...form, images: [...form.images, ""] });
+    setAdditionalModes([...additionalModes, "url"]);
+  };
+
+  const removeAdditionalImage = (index: number) => {
+    setForm({ ...form, images: form.images.filter((_, i) => i !== index) });
+    setAdditionalModes(additionalModes.filter((_, i) => i !== index));
+  };
+
+  const updateAdditionalImage = (index: number, value: string) => {
+    const newImages = [...form.images];
+    newImages[index] = value;
+    setForm({ ...form, images: newImages });
   };
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -184,7 +252,13 @@ export function AdminDashboard() {
                   {/* Product Form Modal */}
                   {showForm && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(0,0,0,0.6)] p-4 backdrop-blur-sm" onClick={resetForm}>
-                      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} onClick={(e) => e.stopPropagation()} className="relative w-full max-w-[32rem] overflow-hidden rounded-[2rem] bg-[#fff] p-[2rem] shadow-2xl">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative max-h-[90vh] w-full max-w-[36rem] overflow-y-auto rounded-[2rem] bg-[#fff] p-[2rem] shadow-2xl"
+                      >
                         <button onClick={resetForm} className="absolute right-[1rem] top-[1rem] grid h-[2rem] w-[2rem] place-items-center rounded-full bg-[rgba(0,0,0,0.05)] text-[rgba(0,0,0,0.5)] hover:bg-[rgba(0,0,0,0.1)]"><X className="h-4 w-4" /></button>
                         <h3 className="mb-[1.5rem] text-[1.25rem] font-semibold">{editing ? "Edit Product" : "New Product"}</h3>
                         <form onSubmit={handleSave} className="flex flex-col gap-[1rem]">
@@ -195,11 +269,117 @@ export function AdminDashboard() {
                             <input required type="number" placeholder="Stock" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} className="w-full rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none focus:border-[#111]" />
                           </div>
                           <input required placeholder="Category" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none focus:border-[#111]" />
-                          <input placeholder="Image URL" value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} className="w-full rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none focus:border-[#111]" />
+
+                          {/* Primary Image */}
+                          <div className="rounded-[0.75rem] border border-[#e2e2e2] p-[1rem]">
+                            <div className="mb-[0.75rem] flex items-center justify-between">
+                              <span className="text-[0.8rem] font-semibold text-[#333]">Primary Image</span>
+                              <div className="flex gap-[0.25rem] rounded-[6px] bg-[#f0f0f0] p-[2px]">
+                                <button type="button" onClick={() => setPrimaryMode("url")} className={`flex items-center gap-[0.25rem] rounded-[5px] px-[0.5rem] py-[0.25rem] text-[0.7rem] font-medium transition-colors ${primaryMode === "url" ? "bg-[#fff] text-[#111] shadow-sm" : "text-[#888]"}`}>
+                                  <Link2 className="h-3 w-3" /> URL
+                                </button>
+                                <button type="button" onClick={() => setPrimaryMode("upload")} className={`flex items-center gap-[0.25rem] rounded-[5px] px-[0.5rem] py-[0.25rem] text-[0.7rem] font-medium transition-colors ${primaryMode === "upload" ? "bg-[#fff] text-[#111] shadow-sm" : "text-[#888]"}`}>
+                                  <Upload className="h-3 w-3" /> Upload
+                                </button>
+                              </div>
+                            </div>
+                            {primaryMode === "url" ? (
+                              <input
+                                placeholder="Paste image URL here..."
+                                value={form.imageUrl.startsWith("data:") ? "" : form.imageUrl}
+                                onChange={e => setForm({ ...form, imageUrl: e.target.value })}
+                                className="w-full rounded-[0.5rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[0.75rem] py-[0.625rem] text-[0.8125rem] outline-none focus:border-[#111]"
+                              />
+                            ) : (
+                              <label className="flex cursor-pointer flex-col items-center gap-[0.5rem] rounded-[0.5rem] border-2 border-dashed border-[#ddd] bg-[#fafafa] py-[1.25rem] transition-colors hover:border-[#bbb] hover:bg-[#f5f5f5]">
+                                <Upload className="h-5 w-5 text-[#aaa]" />
+                                <span className="text-[0.75rem] text-[#888]">Click or drag image to upload</span>
+                                <span className="text-[0.65rem] text-[#bbb]">PNG, JPG, WebP — max 5MB</span>
+                                <input type="file" accept="image/*" onChange={handlePrimaryUpload} className="hidden" />
+                              </label>
+                            )}
+                            {form.imageUrl && (
+                              <div className="mt-[0.75rem] flex items-center gap-[0.5rem]">
+                                <img src={form.imageUrl} alt="Preview" className="h-[3rem] w-[3rem] rounded-[6px] object-cover border border-[#e2e2e2]" />
+                                <span className="flex-1 truncate text-[0.7rem] text-[#888]">
+                                  {form.imageUrl.startsWith("data:") ? "Uploaded image (base64)" : form.imageUrl}
+                                </span>
+                                <button type="button" onClick={() => setForm({ ...form, imageUrl: "" })} className="rounded-full bg-[rgba(0,0,0,0.05)] p-[0.25rem] text-[#aaa] hover:text-red-500">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Additional Images */}
+                          <div className="rounded-[0.75rem] border border-[#e2e2e2] p-[1rem]">
+                            <div className="mb-[0.75rem] flex items-center justify-between">
+                              <span className="text-[0.8rem] font-semibold text-[#333]">Additional Images</span>
+                              <button type="button" onClick={addAdditionalImage} className="flex items-center gap-[0.25rem] rounded-[6px] bg-[#f0f0f0] px-[0.5rem] py-[0.25rem] text-[0.7rem] font-medium text-[#555] hover:bg-[#e0e0e0]">
+                                <Plus className="h-3 w-3" /> Add
+                              </button>
+                            </div>
+                            {form.images.length === 0 && (
+                              <p className="text-[0.75rem] text-[#aaa]">No additional images. Click "Add" to include gallery images.</p>
+                            )}
+                            <div className="flex flex-col gap-[0.75rem]">
+                              {form.images.map((img, i) => (
+                                <div key={i} className="rounded-[0.5rem] border border-[#e8e8e8] p-[0.75rem]">
+                                  <div className="mb-[0.5rem] flex items-center justify-between">
+                                    <span className="text-[0.7rem] font-medium text-[#666]">Image {i + 1}</span>
+                                    <div className="flex items-center gap-[0.375rem]">
+                                      <div className="flex gap-[0.125rem] rounded-[5px] bg-[#f0f0f0] p-[1px]">
+                                        <button type="button" onClick={() => { const m = [...additionalModes]; m[i] = "url"; setAdditionalModes(m); }} className={`rounded-[4px] px-[0.375rem] py-[0.125rem] text-[0.6rem] font-medium transition-colors ${additionalModes[i] === "url" ? "bg-[#fff] text-[#111] shadow-sm" : "text-[#999]"}`}>
+                                          URL
+                                        </button>
+                                        <button type="button" onClick={() => { const m = [...additionalModes]; m[i] = "upload"; setAdditionalModes(m); }} className={`rounded-[4px] px-[0.375rem] py-[0.125rem] text-[0.6rem] font-medium transition-colors ${additionalModes[i] === "upload" ? "bg-[#fff] text-[#111] shadow-sm" : "text-[#999]"}`}>
+                                          Upload
+                                        </button>
+                                      </div>
+                                      <button type="button" onClick={() => removeAdditionalImage(i)} className="rounded-full p-[0.125rem] text-[#ccc] hover:text-red-500">
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  {additionalModes[i] === "url" ? (
+                                    <input
+                                      placeholder="Image URL..."
+                                      value={img.startsWith("data:") ? "" : img}
+                                      onChange={e => updateAdditionalImage(i, e.target.value)}
+                                      className="w-full rounded-[0.375rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[0.625rem] py-[0.5rem] text-[0.75rem] outline-none focus:border-[#111]"
+                                    />
+                                  ) : (
+                                    <label className="flex cursor-pointer items-center gap-[0.5rem] rounded-[0.375rem] border border-dashed border-[#ddd] bg-[#fafafa] px-[0.625rem] py-[0.5rem] text-[0.7rem] text-[#999] transition-colors hover:border-[#bbb]">
+                                      <Upload className="h-3.5 w-3.5" />
+                                      Click to upload
+                                      <input type="file" accept="image/*" onChange={(e) => handleAdditionalUpload(i, e)} className="hidden" />
+                                    </label>
+                                  )}
+                                  {img && (
+                                    <div className="mt-[0.5rem] flex items-center gap-[0.375rem]">
+                                      <img src={img} alt="" className="h-[2rem] w-[2rem] rounded-[4px] object-cover border border-[#e8e8e8]" />
+                                      <span className="truncate text-[0.6rem] text-[#aaa]">{img.startsWith("data:") ? "Uploaded" : img}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {/* Image preview strip */}
+                            {form.images.filter(Boolean).length > 0 && (
+                              <div className="mt-[0.75rem] flex gap-[0.375rem] overflow-x-auto">
+                                {form.images.filter(Boolean).map((img, i) => (
+                                  <img key={i} src={img} alt="" className="h-[2.5rem] w-[2.5rem] shrink-0 rounded-[4px] object-cover border border-[#e2e2e2]" />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Featured toggle */}
                           <label className="flex items-center gap-[0.5rem] text-[0.875rem]">
-                            <input type="checkbox" checked={form.isFeatured} onChange={e => setForm({ ...form, isFeatured: e.target.checked })} className="h-4 w-4" />
+                            <input type="checkbox" checked={form.isFeatured} onChange={e => setForm({ ...form, isFeatured: e.target.checked })} className="h-4 w-4 accent-[#111]" />
                             Featured product
                           </label>
+
                           <div className="flex justify-end gap-[0.75rem] pt-[0.5rem]">
                             <button type="button" onClick={resetForm} className="rounded-[0.75rem] px-[1rem] py-[0.625rem] text-[0.875rem] text-[rgba(0,0,0,0.5)] hover:text-[#111]">Cancel</button>
                             <button type="submit" className="rounded-[0.75rem] bg-[#111] px-[1.5rem] py-[0.625rem] text-[0.875rem] font-medium text-[#fff] hover:bg-[#333]">{editing ? "Update" : "Create"}</button>
@@ -221,7 +401,10 @@ export function AdminDashboard() {
                             <span className="text-[1rem] font-medium text-[#fff] truncate">{p.name}</span>
                             {p.isFeatured && <span className="rounded-full bg-[rgba(255,255,255,0.1)] px-[0.5rem] py-[0.125rem] text-[0.65rem] font-medium text-[rgba(255,255,255,0.6)]">Featured</span>}
                           </div>
-                          <div className="text-[0.75rem] text-[rgba(255,255,255,0.4)]">{p.category} — Stock: {p.stock}</div>
+                          <div className="text-[0.75rem] text-[rgba(255,255,255,0.4)]">
+                            {p.category} — Stock: {p.stock}
+                            {(p.images?.length > 0) && ` — ${p.images.length + (p.imageUrl ? 1 : 0)} images`}
+                          </div>
                         </div>
                         <div className="text-[1rem] font-semibold text-[#fff]">${Number(p.price).toFixed(2)}</div>
                         <div className="flex gap-[0.5rem]">
