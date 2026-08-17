@@ -471,7 +471,7 @@ function BannerSlide({ banner, active }: { banner: Banner; active: boolean }) {
 
   const content = (
     <>
-      <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
+      <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-contain" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 px-6 md:px-12 pb-10 max-w-7xl mx-auto">
         <h2 className="text-2xl md:text-4xl font-semibold text-white tracking-tight">{banner.title}</h2>
