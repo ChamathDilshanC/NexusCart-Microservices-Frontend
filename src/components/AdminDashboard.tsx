@@ -6,11 +6,11 @@ import { useAppState, PillButton } from "./Shared";
 import { LiquidRevealCanvas } from "./Hero";
 import {
   Package, ShoppingBag, Users, Plus, Pencil, Trash2,
-  ChevronDown, X, Upload, Link2, Image as ImageIcon, GripVertical
+  ChevronDown, X, Upload, Link2, Image as ImageIcon, GripVertical, ImagePlus, Eye, EyeOff
 } from "lucide-react";
 import { goeyToast } from "goey-toast";
 
-type Tab = "products" | "orders" | "users";
+type Tab = "products" | "orders" | "users" | "banners";
 type ImageMode = "url" | "upload";
 
 const authHeaders = () => ({
@@ -46,6 +46,15 @@ export function AdminDashboard() {
   const [primaryMode, setPrimaryMode] = useState<ImageMode>("url");
   const [additionalModes, setAdditionalModes] = useState<ImageMode[]>([]);
 
+  // Banner state
+  const [banners, setBanners] = useState<any[]>([]);
+  const [showBannerForm, setShowBannerForm] = useState(false);
+  const [editingBanner, setEditingBanner] = useState<any>(null);
+  const [bannerForm, setBannerForm] = useState({
+    title: "", subtitle: "", imageUrl: "", linkUrl: "", order: "0", isActive: true
+  });
+  const [bannerImageMode, setBannerImageMode] = useState<ImageMode>("url");
+
   const fetchProducts = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/products", { headers: authHeaders() });
@@ -74,10 +83,17 @@ export function AdminDashboard() {
     } catch (e) { console.error(e); }
   }, []);
 
+  const fetchBanners = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/banners", { headers: authHeaders() });
+      if (res.ok) setBanners(await res.json());
+    } catch (e) { console.error(e); }
+  }, []);
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchProducts(), fetchOrders(), fetchUsers(), fetchMetrics()]).finally(() => setLoading(false));
-  }, [fetchProducts, fetchOrders, fetchUsers, fetchMetrics]);
+    Promise.all([fetchProducts(), fetchOrders(), fetchUsers(), fetchMetrics(), fetchBanners()]).finally(() => setLoading(false));
+  }, [fetchProducts, fetchOrders, fetchUsers, fetchMetrics, fetchBanners]);
 
   const resetForm = () => {
     setForm({ name: "", description: "", price: "", stock: "", category: "", imageUrl: "", images: [], isFeatured: false });
@@ -177,10 +193,76 @@ export function AdminDashboard() {
     setForm({ ...form, images: newImages });
   };
 
+  // Banner handlers
+  const resetBannerForm = () => {
+    setBannerForm({ title: "", subtitle: "", imageUrl: "", linkUrl: "", order: "0", isActive: true });
+    setBannerImageMode("url");
+    setEditingBanner(null);
+    setShowBannerForm(false);
+  };
+
+  const openBannerEdit = (b: any) => {
+    setEditingBanner(b);
+    setBannerForm({
+      title: b.title, subtitle: b.subtitle || "", imageUrl: b.imageUrl,
+      linkUrl: b.linkUrl || "", order: String(b.order), isActive: b.isActive
+    });
+    setBannerImageMode(b.imageUrl?.startsWith("data:") ? "upload" : "url");
+    setShowBannerForm(true);
+  };
+
+  const handleBannerSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const body = { ...bannerForm, order: Number(bannerForm.order) };
+    const url = editingBanner ? `/api/admin/banners/${editingBanner._id}` : "/api/admin/banners";
+    const method = editingBanner ? "PUT" : "POST";
+    try {
+      const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+      if (res.ok) {
+        goeyToast.success(editingBanner ? "Banner updated" : "Banner created");
+        resetBannerForm();
+        fetchBanners();
+      } else {
+        const d = await res.json();
+        goeyToast.error(d.message || "Failed");
+      }
+    } catch { goeyToast.error("Network error"); }
+  };
+
+  const handleBannerDelete = async (id: string) => {
+    if (!confirm("Delete this banner?")) return;
+    try {
+      const res = await fetch(`/api/admin/banners/${id}`, { method: "DELETE", headers: authHeaders() });
+      if (res.ok) { goeyToast.success("Banner deleted"); fetchBanners(); }
+    } catch { goeyToast.error("Failed to delete"); }
+  };
+
+  const handleBannerToggle = async (banner: any) => {
+    try {
+      const res = await fetch(`/api/admin/banners/${banner._id}`, {
+        method: "PUT", headers: authHeaders(),
+        body: JSON.stringify({ isActive: !banner.isActive })
+      });
+      if (res.ok) { goeyToast.success(banner.isActive ? "Banner hidden" : "Banner shown"); fetchBanners(); }
+    } catch { goeyToast.error("Failed to toggle"); }
+  };
+
+  const handleBannerImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { goeyToast.error("Image must be under 5MB"); return; }
+    try {
+      const base64 = await fileToBase64(file);
+      setBannerForm({ ...bannerForm, imageUrl: base64 });
+      goeyToast.success("Banner image uploaded");
+    } catch { goeyToast.error("Upload failed"); }
+  };
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "products", label: "Products", icon: <Package className="h-4 w-4" /> },
     { key: "orders", label: "Orders", icon: <ShoppingBag className="h-4 w-4" /> },
     { key: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
+    { key: "banners", label: "Banners", icon: <ImagePlus className="h-4 w-4" /> },
   ];
 
   return (
@@ -470,6 +552,137 @@ export function AdminDashboard() {
                       </span>
                     </div>
                   ))}
+                </motion.div>
+              )}
+
+              {/* BANNERS TAB */}
+              {tab === "banners" && (
+                <motion.div key="banners" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+                  {/* Banner Form Modal */}
+                  {showBannerForm && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(0,0,0,0.6)] p-4 backdrop-blur-sm" onClick={resetBannerForm}>
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative max-h-[90vh] w-full max-w-[36rem] overflow-y-auto rounded-[2rem] bg-[#fff] p-[2rem] shadow-2xl"
+                      >
+                        <button onClick={resetBannerForm} className="absolute right-[1rem] top-[1rem] grid h-[2rem] w-[2rem] place-items-center rounded-full bg-[rgba(0,0,0,0.05)] text-[rgba(0,0,0,0.5)] hover:bg-[rgba(0,0,0,0.1)]"><X className="h-4 w-4" /></button>
+                        <h3 className="mb-[1.5rem] text-[1.25rem] font-semibold">{editingBanner ? "Edit Banner" : "New Banner"}</h3>
+                        <form onSubmit={handleBannerSave} className="flex flex-col gap-[1rem]">
+                          <input required placeholder="Banner title" value={bannerForm.title} onChange={e => setBannerForm({ ...bannerForm, title: e.target.value })} className="w-full rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none focus:border-[#111]" />
+                          <input placeholder="Subtitle (optional)" value={bannerForm.subtitle} onChange={e => setBannerForm({ ...bannerForm, subtitle: e.target.value })} className="w-full rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none focus:border-[#111]" />
+                          <input placeholder="Link URL (optional — click-through destination)" value={bannerForm.linkUrl} onChange={e => setBannerForm({ ...bannerForm, linkUrl: e.target.value })} className="w-full rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none focus:border-[#111]" />
+                          <div className="grid grid-cols-2 gap-[1rem]">
+                            <input type="number" placeholder="Display order" value={bannerForm.order} onChange={e => setBannerForm({ ...bannerForm, order: e.target.value })} className="w-full rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem] outline-none focus:border-[#111]" />
+                            <label className="flex items-center gap-[0.5rem] rounded-[0.75rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[1rem] py-[0.75rem] text-[0.875rem]">
+                              <input type="checkbox" checked={bannerForm.isActive} onChange={e => setBannerForm({ ...bannerForm, isActive: e.target.checked })} className="h-4 w-4 accent-[#111]" />
+                              Active
+                            </label>
+                          </div>
+
+                          {/* Banner Image */}
+                          <div className="rounded-[0.75rem] border border-[#e2e2e2] p-[1rem]">
+                            <div className="mb-[0.75rem] flex items-center justify-between">
+                              <span className="text-[0.8rem] font-semibold text-[#333]">Banner Image</span>
+                              <div className="flex gap-[0.25rem] rounded-[6px] bg-[#f0f0f0] p-[2px]">
+                                <button type="button" onClick={() => setBannerImageMode("url")} className={`flex items-center gap-[0.25rem] rounded-[5px] px-[0.5rem] py-[0.25rem] text-[0.7rem] font-medium transition-colors ${bannerImageMode === "url" ? "bg-[#fff] text-[#111] shadow-sm" : "text-[#888]"}`}>
+                                  <Link2 className="h-3 w-3" /> URL
+                                </button>
+                                <button type="button" onClick={() => setBannerImageMode("upload")} className={`flex items-center gap-[0.25rem] rounded-[5px] px-[0.5rem] py-[0.25rem] text-[0.7rem] font-medium transition-colors ${bannerImageMode === "upload" ? "bg-[#fff] text-[#111] shadow-sm" : "text-[#888]"}`}>
+                                  <Upload className="h-3 w-3" /> Upload
+                                </button>
+                              </div>
+                            </div>
+                            {bannerImageMode === "url" ? (
+                              <input
+                                required
+                                placeholder="Paste banner image URL here..."
+                                value={bannerForm.imageUrl.startsWith("data:") ? "" : bannerForm.imageUrl}
+                                onChange={e => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                                className="w-full rounded-[0.5rem] border border-[#e2e2e2] bg-[#f8f8f8] px-[0.75rem] py-[0.625rem] text-[0.8125rem] outline-none focus:border-[#111]"
+                              />
+                            ) : (
+                              <label className="flex cursor-pointer flex-col items-center gap-[0.5rem] rounded-[0.5rem] border-2 border-dashed border-[#ddd] bg-[#fafafa] py-[1.25rem] transition-colors hover:border-[#bbb] hover:bg-[#f5f5f5]">
+                                <Upload className="h-5 w-5 text-[#aaa]" />
+                                <span className="text-[0.75rem] text-[#888]">Click or drag image to upload</span>
+                                <span className="text-[0.65rem] text-[#bbb]">PNG, JPG, WebP — max 5MB</span>
+                                <input type="file" accept="image/*" onChange={handleBannerImageUpload} className="hidden" />
+                              </label>
+                            )}
+                            {bannerForm.imageUrl && (
+                              <div className="mt-[0.75rem]">
+                                <img src={bannerForm.imageUrl} alt="Banner preview" className="w-full max-h-[12rem] rounded-[6px] object-cover border border-[#e2e2e2]" />
+                                <div className="mt-[0.375rem] flex items-center justify-between">
+                                  <span className="text-[0.7rem] text-[#888]">
+                                    {bannerForm.imageUrl.startsWith("data:") ? "Uploaded image (base64)" : "URL image"}
+                                  </span>
+                                  <button type="button" onClick={() => setBannerForm({ ...bannerForm, imageUrl: "" })} className="rounded-full bg-[rgba(0,0,0,0.05)] p-[0.25rem] text-[#aaa] hover:text-red-500">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex justify-end gap-[0.75rem] pt-[0.5rem]">
+                            <button type="button" onClick={resetBannerForm} className="rounded-[0.75rem] px-[1rem] py-[0.625rem] text-[0.875rem] text-[rgba(0,0,0,0.5)] hover:text-[#111]">Cancel</button>
+                            <button type="submit" className="rounded-[0.75rem] bg-[#111] px-[1.5rem] py-[0.625rem] text-[0.875rem] font-medium text-[#fff] hover:bg-[#333]">{editingBanner ? "Update" : "Create"}</button>
+                          </div>
+                        </form>
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {/* Banners header */}
+                  <div className="mb-[1rem] flex items-center justify-between">
+                    <span className="text-[0.875rem] text-[rgba(255,255,255,0.5)]">{banners.length} banner{banners.length !== 1 ? "s" : ""}</span>
+                    <button onClick={() => { resetBannerForm(); setShowBannerForm(true); }} className="flex items-center gap-[0.5rem] rounded-[12px] bg-[#fff] px-[1rem] py-[0.5rem] text-[0.875rem] font-medium text-[#111] transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                      <Plus className="h-4 w-4" /> Add Banner
+                    </button>
+                  </div>
+
+                  {/* Banners list */}
+                  <div className="flex flex-col gap-[0.75rem]">
+                    {banners.length === 0 ? (
+                      <div className="flex h-[200px] flex-col items-center justify-center gap-[0.75rem] rounded-[16px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] text-[rgba(255,255,255,0.5)]">
+                        <ImagePlus className="h-8 w-8 text-[rgba(255,255,255,0.2)]" />
+                        <span>No banners yet. Add your first promotional banner!</span>
+                      </div>
+                    ) : banners.map((b) => (
+                      <div key={b._id} className={`flex items-center gap-[1rem] rounded-[16px] border p-[1rem] backdrop-blur-xl transition-colors ${b.isActive ? "border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.06)]" : "border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.01)] opacity-60"}`}>
+                        {b.imageUrl ? (
+                          <img src={b.imageUrl} alt={b.title} className="h-[3.5rem] w-[6rem] rounded-[8px] object-cover" />
+                        ) : (
+                          <div className="grid h-[3.5rem] w-[6rem] place-items-center rounded-[8px] bg-[rgba(255,255,255,0.05)]">
+                            <ImageIcon className="h-5 w-5 text-[rgba(255,255,255,0.3)]" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-[0.5rem]">
+                            <span className="text-[1rem] font-medium text-[#fff] truncate">{b.title}</span>
+                            {b.isActive ? (
+                              <span className="rounded-full bg-[rgba(34,197,94,0.15)] px-[0.5rem] py-[0.125rem] text-[0.65rem] font-medium text-green-400">Live</span>
+                            ) : (
+                              <span className="rounded-full bg-[rgba(255,255,255,0.05)] px-[0.5rem] py-[0.125rem] text-[0.65rem] font-medium text-[rgba(255,255,255,0.4)]">Hidden</span>
+                            )}
+                          </div>
+                          <div className="text-[0.75rem] text-[rgba(255,255,255,0.4)]">
+                            {b.subtitle || "No subtitle"} — Order: {b.order}
+                            {b.linkUrl && ` — Link: ${b.linkUrl.slice(0, 30)}...`}
+                          </div>
+                        </div>
+                        <div className="flex gap-[0.375rem]">
+                          <button onClick={() => handleBannerToggle(b)} className="grid h-[2rem] w-[2rem] place-items-center rounded-[8px] text-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.1)] hover:text-[#fff]" title={b.isActive ? "Hide" : "Show"}>
+                            {b.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                          <button onClick={() => openBannerEdit(b)} className="grid h-[2rem] w-[2rem] place-items-center rounded-[8px] text-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.1)] hover:text-[#fff]"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => handleBannerDelete(b._id)} className="grid h-[2rem] w-[2rem] place-items-center rounded-[8px] text-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,0,0,0.1)] hover:text-red-400"><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

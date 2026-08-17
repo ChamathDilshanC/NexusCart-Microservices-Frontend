@@ -8,7 +8,7 @@ import { useAppState } from "@/components/Shared";
 import {
   Search, ShoppingBag, X, ChevronRight, ChevronLeft,
   SlidersHorizontal, ShoppingCart, Check, Home, Heart,
-  Eye, ArrowUpDown, Tag, Filter, Box, CircleCheck
+  Eye, ArrowUpDown, Tag, Filter, Box, CircleCheck, ChevronLeftCircle, ChevronRightCircle
 } from "lucide-react";
 
 interface Product {
@@ -21,6 +21,16 @@ interface Product {
   imageUrl?: string;
   images: string[];
   isFeatured: boolean;
+}
+
+interface Banner {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  imageUrl: string;
+  linkUrl?: string;
+  order: number;
+  isActive: boolean;
 }
 
 const ITEMS_PER_PAGE = 12;
@@ -56,6 +66,8 @@ export default function ShopPage() {
   const [availability, setAvailability] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannerIndex, setBannerIndex] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -71,6 +83,23 @@ export default function ShopPage() {
       .then((data) => { if (Array.isArray(data)) setCategories(data); })
       .catch(() => {});
   }, []);
+
+  // Fetch banners
+  useEffect(() => {
+    fetch("/api/products/banners")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data) && data.length > 0) setBanners(data); })
+      .catch(() => {});
+  }, []);
+
+  // Auto-advance banner carousel
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
 
   const fetchProducts = useCallback(() => {
     setLoading(true);
@@ -183,6 +212,69 @@ export default function ShopPage() {
       <AuthModal />
 
       <main className="min-h-screen" style={{ background: "var(--shop-bg)", fontFamily: shopFont }}>
+        {/* Banner Marquee */}
+        {banners.length > 0 && (
+          <div className="relative w-full overflow-hidden bg-[#111]">
+            <div className="relative h-[200px] sm:h-[280px] lg:h-[360px]">
+              {banners.map((banner, i) => (
+                <div
+                  key={banner._id}
+                  className="absolute inset-0 transition-all duration-700 ease-in-out"
+                  style={{ opacity: i === bannerIndex ? 1 : 0, transform: i === bannerIndex ? "scale(1)" : "scale(1.05)" }}
+                >
+                  {banner.linkUrl ? (
+                    <a href={banner.linkUrl} className="block h-full w-full">
+                      <img src={banner.imageUrl} alt={banner.title} className="h-full w-full object-cover" />
+                    </a>
+                  ) : (
+                    <img src={banner.imageUrl} alt={banner.title} className="h-full w-full object-cover" />
+                  )}
+                  {/* Overlay gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[rgba(0,0,0,0.6)] via-transparent to-transparent" />
+                  {/* Text overlay */}
+                  <div className="absolute bottom-[1.5rem] left-[1.5rem] right-[1.5rem] sm:bottom-[2rem] sm:left-[3rem] sm:right-auto lg:bottom-[3rem] lg:left-[4rem]">
+                    <h2 className="text-[1.25rem] font-bold text-[#fff] drop-shadow-lg sm:text-[1.75rem] lg:text-[2.25rem]">
+                      {banner.title}
+                    </h2>
+                    {banner.subtitle && (
+                      <p className="mt-[0.25rem] text-[0.8125rem] text-[rgba(255,255,255,0.85)] drop-shadow sm:text-[0.9375rem]">
+                        {banner.subtitle}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Navigation arrows */}
+            {banners.length > 1 && (
+              <>
+                <button
+                  onClick={() => setBannerIndex((prev) => (prev - 1 + banners.length) % banners.length)}
+                  className="absolute left-[0.75rem] top-1/2 -translate-y-1/2 grid h-[2.25rem] w-[2.25rem] place-items-center rounded-full bg-[rgba(255,255,255,0.15)] text-white backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.3)]"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setBannerIndex((prev) => (prev + 1) % banners.length)}
+                  className="absolute right-[0.75rem] top-1/2 -translate-y-1/2 grid h-[2.25rem] w-[2.25rem] rounded-full bg-[rgba(255,255,255,0.15)] text-white backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.3)] place-items-center"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                {/* Dots indicator */}
+                <div className="absolute bottom-[0.75rem] left-1/2 flex -translate-x-1/2 gap-[0.375rem]">
+                  {banners.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setBannerIndex(i)}
+                      className={`h-[0.375rem] rounded-full transition-all duration-300 ${i === bannerIndex ? "w-[1.5rem] bg-[var(--shop-accent)]" : "w-[0.375rem] bg-[rgba(255,255,255,0.4)]"}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Breadcrumb */}
         <div className="border-b border-[rgba(0,0,0,0.06)] bg-[#fff]">
           <div className="shell flex items-center gap-[0.5rem] px-[1.25rem] py-[0.75rem] text-[0.8125rem] sm:px-[2rem]">
