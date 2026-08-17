@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { Onest } from "next/font/google";
 import "./globals.css";
-import { ScrollProvider } from "@/components/ScrollProvider";
-import { AppStateProvider } from "@/components/Shared";
-import { ToastProvider } from "@/components/ToastProvider";
-import { ViewportScaler } from "@/components/ViewportScaler";
 
 const onest = Onest({
   variable: "--font-sans",
@@ -14,22 +10,29 @@ const onest = Onest({
 });
 
 export const metadata: Metadata = {
-  title: "NexusCart — Enterprise E-commerce Platform",
-  description: "NexusCart is a highly scalable, microservices-based e-commerce platform built for modern businesses.",
+  title: "NexusCart — Buy and sell, beautifully.",
+  description:
+    "NexusCart is a multi-vendor e-commerce platform that brings shoppers and sellers together — branded storefronts, real-time order tracking, and secure checkout in one place.",
+  icons: {
+    icon: "/Logo/Logo%20with%20out%20Text.png",
+  },
   openGraph: {
+    title: "NexusCart — Buy and sell, beautifully.",
+    description:
+      "A multi-vendor e-commerce platform built for modern shoppers and sellers.",
     images: [
       {
-        url: "/Logo/Logo with out Text.png",
+        url: "/Logo/Logo%20with%20out%20Text.png",
         width: 1200,
         height: 630,
-        alt: "NexusCart Logo",
-      }
+        alt: "NexusCart",
+      },
     ],
   },
 };
 
 export const viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
@@ -38,19 +41,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={onest.variable}>
-      <head>
-        <meta name="theme-color" content="#0a0a0a" />
-      </head>
-      <body className="antialiased">
-        <ViewportScaler />
-        <ScrollProvider>
-          <AppStateProvider>
-            {children}
-            <ToastProvider />
-          </AppStateProvider>
-        </ScrollProvider>
-      </body>
+    <html lang="en" className={`${onest.variable} scroll-smooth`}>
+      <body className="bg-black text-white antialiased">{children}</body>
     </html>
   );
 }
