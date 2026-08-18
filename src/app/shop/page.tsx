@@ -39,44 +39,40 @@ interface Banner {
   linkUrl?: string;
   order: number;
   isActive: boolean;
-  layouts?: BannerLayout[];
+  templateIds?: string[];
 }
 
 type BannerLayout = "carousel" | "grid" | "spotlight";
 type BannerPosition = "top" | "above-grid" | "bottom";
 
-interface BannerSettings {
-  layout: BannerLayout;
-  position: BannerPosition;
-  options: {
-    carousel: {
-      autoAdvance: boolean;
-      intervalMs: number;
-      showArrows: boolean;
-      showDots: boolean;
-      height: "compact" | "standard" | "tall";
-    };
-    grid: {
-      columns: number;
-      aspectRatio: "landscape" | "square";
-      showSubtitle: boolean;
-    };
-    spotlight: {
-      maxListItems: number;
-      showListSubtitle: boolean;
-    };
+interface BannerTemplateOptions {
+  carousel: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
+    showDots: boolean;
+    height: "compact" | "standard" | "tall";
+  };
+  grid: {
+    columns: number;
+    aspectRatio: "landscape" | "square";
+    showSubtitle: boolean;
+  };
+  spotlight: {
+    maxListItems: number;
+    showListSubtitle: boolean;
   };
 }
 
-const DEFAULT_BANNER_SETTINGS: BannerSettings = {
-  layout: "carousel",
-  position: "top",
-  options: {
-    carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
-    grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
-    spotlight: { maxListItems: 4, showListSubtitle: false },
-  },
-};
+interface BannerTemplate {
+  _id: string;
+  name: string;
+  layout: BannerLayout;
+  position: BannerPosition;
+  isActive: boolean;
+  order: number;
+  options: BannerTemplateOptions;
+}
 
 type SortOption = "price_asc" | "price_desc" | "name_asc" | "newest";
 type Availability = "in_stock" | "out_of_stock";
@@ -137,8 +133,7 @@ function ShopContent() {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
-  const [bannerIndex, setBannerIndex] = useState(0);
+  const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -155,20 +150,18 @@ function ShopContent() {
   const [priceMax, setPriceMax] = useState("");
   const [availability, setAvailability] = useState<Availability[]>([]);
 
-  // Fetch categories + banners + banner layout settings once.
+  // Fetch categories + banners + banner templates once.
   useEffect(() => {
     (async () => {
       try {
-        const [cats, bnrs, settings] = await Promise.all([
+        const [cats, bnrs, tpls] = await Promise.all([
           apiFetch<string[]>("/products/categories", { auth: false }),
           apiFetch<Banner[]>("/products/banners", { auth: false }),
-          apiFetch<BannerSettings>("/products/banner-settings", { auth: false }).catch(
-            () => DEFAULT_BANNER_SETTINGS
-          ),
+          apiFetch<BannerTemplate[]>("/products/banner-templates", { auth: false }).catch(() => []),
         ]);
         setCategories(cats);
         setBanners(bnrs);
-        setBannerSettings(settings);
+        setBannerTemplates(tpls);
       } catch {
         // Non-fatal: filters/banner section simply stay empty.
       }
@@ -203,34 +196,46 @@ function ShopContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, selectedCategories.join(","), sort, priceMin, priceMax, availability.join(",")]);
 
-  // Banners tagged for a specific layout only show when that layout is active;
-  // an untagged banner (no layouts, or an empty list) shows under every layout.
-  const visibleBanners = useMemo(
-    () =>
-      banners.filter((b) => !b.layouts || b.layouts.length === 0 || b.layouts.includes(bannerSettings.layout)),
-    [banners, bannerSettings.layout]
-  );
+  // Active templates grouped by where they render on the page; every active
+  // template renders simultaneously, each showing only its own tagged banners
+  // (an untagged banner — no templateIds, or an empty list — shows under all of them).
+  const templatesByPosition = useMemo(() => {
+    const grouped: Record<BannerPosition, BannerTemplate[]> = { top: [], "above-grid": [], bottom: [] };
+    for (const tpl of bannerTemplates) {
+      if (!tpl.isActive) continue;
+      grouped[tpl.position]?.push(tpl);
+    }
+    (Object.keys(grouped) as BannerPosition[]).forEach((key) => {
+      grouped[key] = [...grouped[key]].sort((a, b) => a.order - b.order);
+    });
+    return grouped;
+  }, [bannerTemplates]);
 
-  // Keep the carousel index in range whenever the visible set changes (e.g. layout switch).
-  useEffect(() => {
-    setBannerIndex((i) => (visibleBanners.length === 0 ? 0 : i % visibleBanners.length));
-  }, [visibleBanners.length]);
+  const bannersForTemplate = (template: BannerTemplate) =>
+    banners.filter((b) => !b.templateIds || b.templateIds.length === 0 || b.templateIds.includes(template._id));
 
-  // Banner auto-advance (carousel layout only).
-  useEffect(() => {
-    if (bannerSettings.layout !== "carousel") return;
-    if (!bannerSettings.options.carousel.autoAdvance) return;
-    if (visibleBanners.length <= 1) return;
-    const id = setInterval(() => {
-      setBannerIndex((i) => (i + 1) % visibleBanners.length);
-    }, bannerSettings.options.carousel.intervalMs);
-    return () => clearInterval(id);
-  }, [
-    visibleBanners.length,
-    bannerSettings.layout,
-    bannerSettings.options.carousel.autoAdvance,
-    bannerSettings.options.carousel.intervalMs,
-  ]);
+  const renderTemplateGroup = (position: BannerPosition) => {
+    const list = templatesByPosition[position];
+    if (!list || list.length === 0) return null;
+    const blocks = list
+      .map((tpl) => {
+        const tplBanners = bannersForTemplate(tpl);
+        return tplBanners.length > 0 ? { tpl, tplBanners } : null;
+      })
+      .filter((b): b is { tpl: BannerTemplate; tplBanners: Banner[] } => b !== null);
+    if (blocks.length === 0) return null;
+    return (
+      <div className="flex flex-col gap-4">
+        {blocks.map(({ tpl, tplBanners }) => (
+          <BannerBlock key={tpl._id} template={tpl} banners={tplBanners} />
+        ))}
+      </div>
+    );
+  };
+
+  const topSection = renderTemplateGroup("top");
+  const aboveGridSection = renderTemplateGroup("above-grid");
+  const bottomSection = renderTemplateGroup("bottom");
 
   const filteredProducts = useMemo(() => {
     const min = priceMin.trim() === "" ? null : Number(priceMin);
@@ -275,25 +280,9 @@ function ShopContent() {
     (priceMax.trim() !== "" ? 1 : 0) +
     (search.trim() !== "" ? 1 : 0);
 
-  const bannerSection =
-    visibleBanners.length > 0 ? (
-      bannerSettings.layout === "grid" ? (
-        <BannerGrid banners={visibleBanners} options={bannerSettings.options.grid} />
-      ) : bannerSettings.layout === "spotlight" ? (
-        <BannerSpotlight banners={visibleBanners} options={bannerSettings.options.spotlight} />
-      ) : (
-        <BannerCarousel
-          banners={visibleBanners}
-          index={bannerIndex}
-          onIndexChange={setBannerIndex}
-          options={bannerSettings.options.carousel}
-        />
-      )
-    ) : null;
-
   return (
     <>
-      {bannerSettings.position === "top" && bannerSection}
+      {topSection}
 
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
@@ -329,7 +318,7 @@ function ShopContent() {
           </button>
         </div>
 
-        {bannerSettings.position === "above-grid" && <div className="mb-8">{bannerSection}</div>}
+        {aboveGridSection && <div className="mb-8">{aboveGridSection}</div>}
 
         <div className="grid lg:grid-cols-4 gap-8">
           <aside className={`${filtersOpen ? "block" : "hidden"} lg:block lg:col-span-1`}>
@@ -483,15 +472,27 @@ function ShopContent() {
           </section>
         </div>
 
-        {bannerSettings.position === "bottom" && <div className="mt-10">{bannerSection}</div>}
+        {bottomSection && <div className="mt-10">{bottomSection}</div>}
       </div>
     </>
   );
 }
 
+/* ---------------------------- Banner block dispatcher ---------------------------- */
+
+function BannerBlock({ template, banners }: { template: BannerTemplate; banners: Banner[] }) {
+  if (template.layout === "grid") {
+    return <BannerGrid banners={banners} options={template.options.grid} />;
+  }
+  if (template.layout === "spotlight") {
+    return <BannerSpotlight banners={banners} options={template.options.spotlight} />;
+  }
+  return <BannerCarousel banners={banners} options={template.options.carousel} />;
+}
+
 /* ---------------------------- Banner carousel ---------------------------- */
 
-const CAROUSEL_HEIGHT_CLASSES: Record<BannerSettings["options"]["carousel"]["height"], string> = {
+const CAROUSEL_HEIGHT_CLASSES: Record<BannerTemplateOptions["carousel"]["height"], string> = {
   compact: "h-[200px] md:h-[280px]",
   standard: "h-[280px] md:h-[380px]",
   tall: "h-[360px] md:h-[480px]",
@@ -499,15 +500,27 @@ const CAROUSEL_HEIGHT_CLASSES: Record<BannerSettings["options"]["carousel"]["hei
 
 function BannerCarousel({
   banners,
-  index,
-  onIndexChange,
   options,
 }: {
   banners: Banner[];
-  index: number;
-  onIndexChange: (i: number) => void;
-  options: BannerSettings["options"]["carousel"];
+  options: BannerTemplateOptions["carousel"];
 }) {
+  const [index, setIndex] = useState(0);
+
+  // Keep the index in range whenever the banner set changes.
+  useEffect(() => {
+    setIndex((i) => (banners.length === 0 ? 0 : i % banners.length));
+  }, [banners.length]);
+
+  useEffect(() => {
+    if (!options.autoAdvance) return;
+    if (banners.length <= 1) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % banners.length);
+    }, options.intervalMs);
+    return () => clearInterval(id);
+  }, [banners.length, options.autoAdvance, options.intervalMs]);
+
   return (
     <div
       className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[options.height]}`}
@@ -521,14 +534,14 @@ function BannerCarousel({
           {options.showArrows && (
             <>
               <button
-                onClick={() => onIndexChange((index - 1 + banners.length) % banners.length)}
+                onClick={() => setIndex((index - 1 + banners.length) % banners.length)}
                 aria-label="Previous banner"
                 className="absolute left-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
-                onClick={() => onIndexChange((index + 1) % banners.length)}
+                onClick={() => setIndex((index + 1) % banners.length)}
                 aria-label="Next banner"
                 className="absolute right-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
               >
@@ -541,7 +554,7 @@ function BannerCarousel({
               {banners.map((_, i) => (
                 <button
                   key={i}
-                  onClick={() => onIndexChange(i)}
+                  onClick={() => setIndex(i)}
                   aria-label={`Go to banner ${i + 1}`}
                   className={`h-1.5 rounded-full transition-all ${
                     i === index ? "w-6 bg-white" : "w-1.5 bg-white/40"
@@ -597,7 +610,7 @@ function BannerGrid({
   options,
 }: {
   banners: Banner[];
-  options: BannerSettings["options"]["grid"];
+  options: BannerTemplateOptions["grid"];
 }) {
   const sorted = [...banners].sort((a, b) => a.order - b.order);
   const columnClass = GRID_COLUMN_CLASSES[options.columns] ?? GRID_COLUMN_CLASSES[3];
@@ -644,7 +657,7 @@ function BannerSpotlight({
   options,
 }: {
   banners: Banner[];
-  options: BannerSettings["options"]["spotlight"];
+  options: BannerTemplateOptions["spotlight"];
 }) {
   const sorted = [...banners].sort((a, b) => a.order - b.order);
   const featured = sorted[0];

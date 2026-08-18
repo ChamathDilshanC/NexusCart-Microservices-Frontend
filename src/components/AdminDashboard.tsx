@@ -84,7 +84,7 @@ interface Banner {
   linkUrl?: string;
   order: number;
   isActive: boolean;
-  layouts?: BannerLayout[];
+  templateIds?: string[];
 }
 
 interface ProductFormValues {
@@ -105,43 +105,54 @@ interface BannerFormValues {
   linkUrl: string;
   order: number;
   isActive: boolean;
-  layouts: BannerLayout[];
+  templateIds: string[];
 }
 
 type BannerLayout = "carousel" | "grid" | "spotlight";
 type BannerPosition = "top" | "above-grid" | "bottom";
 
-interface BannerSettings {
-  layout: BannerLayout;
-  position: BannerPosition;
-  options: {
-    carousel: {
-      autoAdvance: boolean;
-      intervalMs: number;
-      showArrows: boolean;
-      showDots: boolean;
-      height: "compact" | "standard" | "tall";
-    };
-    grid: {
-      columns: number;
-      aspectRatio: "landscape" | "square";
-      showSubtitle: boolean;
-    };
-    spotlight: {
-      maxListItems: number;
-      showListSubtitle: boolean;
-    };
+interface BannerTemplateOptions {
+  carousel: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
+    showDots: boolean;
+    height: "compact" | "standard" | "tall";
+  };
+  grid: {
+    columns: number;
+    aspectRatio: "landscape" | "square";
+    showSubtitle: boolean;
+  };
+  spotlight: {
+    maxListItems: number;
+    showListSubtitle: boolean;
   };
 }
 
-const DEFAULT_BANNER_SETTINGS: BannerSettings = {
-  layout: "carousel",
-  position: "top",
-  options: {
-    carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
-    grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
-    spotlight: { maxListItems: 4, showListSubtitle: false },
-  },
+interface BannerTemplate {
+  _id: string;
+  name: string;
+  layout: BannerLayout;
+  position: BannerPosition;
+  isActive: boolean;
+  order: number;
+  options: BannerTemplateOptions;
+}
+
+interface BannerTemplateFormValues {
+  name: string;
+  layout: BannerLayout;
+  position: BannerPosition;
+  isActive: boolean;
+  order: number;
+  options: BannerTemplateOptions;
+}
+
+const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
+  carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
+  grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
+  spotlight: { maxListItems: 4, showListSubtitle: false },
 };
 
 /* ---------------------------------- Shared styles ---------------------------------- */
@@ -534,11 +545,13 @@ function ProductForm({
 
 function BannerForm({
   initial,
+  templates,
   submitting,
   onCancel,
   onSubmit,
 }: {
   initial: Banner | null;
+  templates: BannerTemplate[];
   submitting: boolean;
   onCancel: () => void;
   onSubmit: (values: BannerFormValues) => void;
@@ -549,11 +562,11 @@ function BannerForm({
   const [order, setOrder] = useState(initial ? String(initial.order) : "0");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
-  const [layouts, setLayouts] = useState<BannerLayout[]>(initial?.layouts ?? []);
+  const [templateIds, setTemplateIds] = useState<string[]>(initial?.templateIds ?? []);
   const toast = useToast();
 
-  const toggleLayout = (id: BannerLayout) => {
-    setLayouts((prev) => (prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id]));
+  const toggleTemplate = (id: string) => {
+    setTemplateIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -569,7 +582,7 @@ function BannerForm({
       order: Number.parseInt(order, 10) || 0,
       isActive,
       imageUrl: imageUrl.trim(),
-      layouts,
+      templateIds,
     });
   };
 
@@ -625,21 +638,27 @@ function BannerForm({
       </div>
 
       <div>
-        <label className="text-xs text-gray-500 mb-1.5 block">Show in layouts</label>
-        <div className="flex flex-wrap gap-4">
-          {LAYOUT_TEMPLATES.map((tpl) => (
-            <label key={tpl.id} className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={layouts.includes(tpl.id)}
-                onChange={() => toggleLayout(tpl.id)}
-                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
-              />
-              <span className="text-sm text-gray-300">{tpl.label}</span>
-            </label>
-          ))}
-        </div>
-        <p className="text-xs text-gray-600 mt-1.5">Leave all unchecked to show in every layout.</p>
+        <label className="text-xs text-gray-500 mb-1.5 block">Show in templates</label>
+        {templates.length === 0 ? (
+          <p className="text-xs text-gray-600">
+            No banner templates yet — create one below and it&apos;ll appear here.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-4">
+            {templates.map((tpl) => (
+              <label key={tpl._id} className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={templateIds.includes(tpl._id)}
+                  onChange={() => toggleTemplate(tpl._id)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+                />
+                <span className="text-sm text-gray-300">{tpl.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-600 mt-1.5">Leave all unchecked to show in every template.</p>
       </div>
 
       <label className="flex items-center gap-3 cursor-pointer select-none">
@@ -976,69 +995,113 @@ function SegmentedControl<T extends string | number>({
   );
 }
 
-function BannerLayoutPanel({
+function BannerTemplateForm({
   initial,
-  saving,
-  onSave,
+  submitting,
+  onCancel,
+  onSubmit,
 }: {
-  initial: BannerSettings;
-  saving: boolean;
-  onSave: (values: BannerSettings) => void;
+  initial: BannerTemplate | null;
+  submitting: boolean;
+  onCancel: () => void;
+  onSubmit: (values: BannerTemplateFormValues) => void;
 }) {
-  const [settings, setSettings] = useState<BannerSettings>(initial);
+  const [name, setName] = useState(initial?.name ?? "");
+  const [layout, setLayout] = useState<BannerLayout>(initial?.layout ?? "carousel");
+  const [position, setPosition] = useState<BannerPosition>(initial?.position ?? "top");
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  const [order, setOrder] = useState(initial ? String(initial.order) : "0");
+  const [options, setOptions] = useState<BannerTemplateOptions>(initial?.options ?? DEFAULT_TEMPLATE_OPTIONS);
+  const toast = useToast();
 
-  useEffect(() => {
-    setSettings(initial);
-  }, [initial]);
+  const updateCarousel = (patch: Partial<BannerTemplateOptions["carousel"]>) =>
+    setOptions((prev) => ({ ...prev, carousel: { ...prev.carousel, ...patch } }));
+  const updateGrid = (patch: Partial<BannerTemplateOptions["grid"]>) =>
+    setOptions((prev) => ({ ...prev, grid: { ...prev.grid, ...patch } }));
+  const updateSpotlight = (patch: Partial<BannerTemplateOptions["spotlight"]>) =>
+    setOptions((prev) => ({ ...prev, spotlight: { ...prev.spotlight, ...patch } }));
 
-  const updateCarousel = (patch: Partial<BannerSettings["options"]["carousel"]>) =>
-    setSettings((prev) => ({ ...prev, options: { ...prev.options, carousel: { ...prev.options.carousel, ...patch } } }));
-  const updateGrid = (patch: Partial<BannerSettings["options"]["grid"]>) =>
-    setSettings((prev) => ({ ...prev, options: { ...prev.options, grid: { ...prev.options.grid, ...patch } } }));
-  const updateSpotlight = (patch: Partial<BannerSettings["options"]["spotlight"]>) =>
-    setSettings((prev) => ({ ...prev, options: { ...prev.options, spotlight: { ...prev.options.spotlight, ...patch } } }));
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Template name is required");
+      return;
+    }
+    onSubmit({
+      name: name.trim(),
+      layout,
+      position,
+      isActive,
+      order: Number.parseInt(order, 10) || 0,
+      options,
+    });
+  };
 
   return (
-    <div className={cardClass}>
-      <h3 className="text-sm font-semibold text-white mb-1">Banner layout</h3>
-      <p className="text-xs text-gray-500 mb-4">Choose how the banner section looks on the shop page.</p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {LAYOUT_TEMPLATES.map((tpl) => (
-          <button
-            type="button"
-            key={tpl.id}
-            onClick={() => setSettings((prev) => ({ ...prev, layout: tpl.id }))}
-            className={`text-left rounded-xl border p-4 transition-colors ${
-              settings.layout === tpl.id ? "border-white bg-white/5" : "border-white/10 hover:border-white/20"
-            }`}
-          >
-            <LayoutPreview layout={tpl.id} />
-            <div className="text-sm font-medium text-white mt-3">{tpl.label}</div>
-            <div className="text-xs text-gray-500 mt-1">{tpl.description}</div>
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-6">
-        <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
-        <SegmentedControl
-          value={settings.position}
-          onChange={(v) => setSettings((prev) => ({ ...prev, position: v }))}
-          options={[
-            { value: "top", label: "Top of page" },
-            { value: "above-grid", label: "Above products" },
-            { value: "bottom", label: "Bottom of page" },
-          ]}
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Template name</label>
+        <input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Summer Sale Grid"
+          className={inputClass}
         />
       </div>
 
-      {settings.layout === "carousel" && (
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Layout</label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {LAYOUT_TEMPLATES.map((tpl) => (
+            <button
+              type="button"
+              key={tpl.id}
+              onClick={() => setLayout(tpl.id)}
+              className={`text-left rounded-xl border p-4 transition-colors ${
+                layout === tpl.id ? "border-white bg-white/5" : "border-white/10 hover:border-white/20"
+              }`}
+            >
+              <LayoutPreview layout={tpl.id} />
+              <div className="text-sm font-medium text-white mt-3">{tpl.label}</div>
+              <div className="text-xs text-gray-500 mt-1">{tpl.description}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
+          <SegmentedControl
+            value={position}
+            onChange={setPosition}
+            options={[
+              { value: "top", label: "Top of page" },
+              { value: "above-grid", label: "Above products" },
+              { value: "bottom", label: "Bottom of page" },
+            ]}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Order within position</label>
+          <input
+            type="number"
+            step="1"
+            value={order}
+            onChange={(e) => setOrder(e.target.value)}
+            placeholder="0"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      {layout === "carousel" && (
         <div className="space-y-4">
           <label className="flex items-center gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
-              checked={settings.options.carousel.autoAdvance}
+              checked={options.carousel.autoAdvance}
               onChange={(e) => updateCarousel({ autoAdvance: e.target.checked })}
               className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
             />
@@ -1051,7 +1114,7 @@ function BannerLayoutPanel({
                 type="number"
                 min={2}
                 max={10}
-                value={Math.round(settings.options.carousel.intervalMs / 1000)}
+                value={Math.round(options.carousel.intervalMs / 1000)}
                 onChange={(e) => {
                   const seconds = Number.parseInt(e.target.value, 10);
                   const clamped = Number.isFinite(seconds) ? Math.min(10, Math.max(2, seconds)) : 5;
@@ -1063,7 +1126,7 @@ function BannerLayoutPanel({
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Height</label>
               <SegmentedControl
-                value={settings.options.carousel.height}
+                value={options.carousel.height}
                 onChange={(v) => updateCarousel({ height: v })}
                 options={[
                   { value: "compact", label: "Compact" },
@@ -1077,7 +1140,7 @@ function BannerLayoutPanel({
             <label className="flex items-center gap-3 cursor-pointer select-none">
               <input
                 type="checkbox"
-                checked={settings.options.carousel.showArrows}
+                checked={options.carousel.showArrows}
                 onChange={(e) => updateCarousel({ showArrows: e.target.checked })}
                 className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
               />
@@ -1086,7 +1149,7 @@ function BannerLayoutPanel({
             <label className="flex items-center gap-3 cursor-pointer select-none">
               <input
                 type="checkbox"
-                checked={settings.options.carousel.showDots}
+                checked={options.carousel.showDots}
                 onChange={(e) => updateCarousel({ showDots: e.target.checked })}
                 className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
               />
@@ -1096,13 +1159,13 @@ function BannerLayoutPanel({
         </div>
       )}
 
-      {settings.layout === "grid" && (
+      {layout === "grid" && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Columns</label>
               <SegmentedControl
-                value={settings.options.grid.columns}
+                value={options.grid.columns}
                 onChange={(v) => updateGrid({ columns: v })}
                 options={[
                   { value: 2, label: "2" },
@@ -1114,7 +1177,7 @@ function BannerLayoutPanel({
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Aspect ratio</label>
               <SegmentedControl
-                value={settings.options.grid.aspectRatio}
+                value={options.grid.aspectRatio}
                 onChange={(v) => updateGrid({ aspectRatio: v })}
                 options={[
                   { value: "landscape", label: "Landscape" },
@@ -1126,7 +1189,7 @@ function BannerLayoutPanel({
           <label className="flex items-center gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
-              checked={settings.options.grid.showSubtitle}
+              checked={options.grid.showSubtitle}
               onChange={(e) => updateGrid({ showSubtitle: e.target.checked })}
               className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
             />
@@ -1135,7 +1198,7 @@ function BannerLayoutPanel({
         </div>
       )}
 
-      {settings.layout === "spotlight" && (
+      {layout === "spotlight" && (
         <div className="space-y-4">
           <div className="max-w-xs">
             <label className="text-xs text-gray-500 mb-1.5 block">Max list items</label>
@@ -1143,7 +1206,7 @@ function BannerLayoutPanel({
               type="number"
               min={1}
               max={8}
-              value={settings.options.spotlight.maxListItems}
+              value={options.spotlight.maxListItems}
               onChange={(e) => {
                 const value = Number.parseInt(e.target.value, 10);
                 const clamped = Number.isFinite(value) ? Math.min(8, Math.max(1, value)) : 4;
@@ -1155,7 +1218,7 @@ function BannerLayoutPanel({
           <label className="flex items-center gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
-              checked={settings.options.spotlight.showListSubtitle}
+              checked={options.spotlight.showListSubtitle}
               onChange={(e) => updateSpotlight({ showListSubtitle: e.target.checked })}
               className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
             />
@@ -1164,11 +1227,144 @@ function BannerLayoutPanel({
         </div>
       )}
 
-      <div className="flex justify-end pt-6 mt-2 border-t border-white/5">
-        <button type="button" disabled={saving} onClick={() => onSave(settings)} className={primaryButtonClass}>
-          {saving ? "Saving…" : "Save layout"}
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={isActive}
+          onChange={(e) => setIsActive(e.target.checked)}
+          className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+        />
+        <span className="text-sm text-gray-300">Active (renders on the shop page)</span>
+      </label>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel} className={secondaryButtonClass}>
+          Cancel
+        </button>
+        <button type="submit" disabled={submitting} className={primaryButtonClass}>
+          {submitting ? "Saving…" : initial ? "Save changes" : "Create template"}
         </button>
       </div>
+    </form>
+  );
+}
+
+function BannerTemplatesSection({
+  templates,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: {
+  templates: BannerTemplate[];
+  onCreate: (values: BannerTemplateFormValues) => Promise<void>;
+  onUpdate: (id: string, values: BannerTemplateFormValues) => Promise<void>;
+  onDelete: (template: BannerTemplate) => Promise<void>;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<BannerTemplate | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const openCreate = () => {
+    setEditing(null);
+    setShowForm(true);
+  };
+  const openEdit = (template: BannerTemplate) => {
+    setEditing(template);
+    setShowForm(true);
+  };
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+  };
+
+  const handleSubmit = async (values: BannerTemplateFormValues) => {
+    setSubmitting(true);
+    try {
+      if (editing) {
+        await onUpdate(editing._id, values);
+      } else {
+        await onCreate(values);
+      }
+      closeForm();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const POSITION_LABELS: Record<BannerPosition, string> = {
+    top: "Top of page",
+    "above-grid": "Above products",
+    bottom: "Bottom of page",
+  };
+
+  return (
+    <div className={cardClass}>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-sm font-semibold text-white">Banner templates</h3>
+        <button onClick={openCreate} className={`${primaryButtonClass} flex items-center gap-2 !px-4 !py-2 text-xs`}>
+          <Plus className="w-3.5 h-3.5" /> Add template
+        </button>
+      </div>
+      <p className="text-xs text-gray-500 mb-4">
+        Every active template renders on the shop page at its own position, all at once.
+      </p>
+
+      {templates.length === 0 ? (
+        <EmptyState message="No banner templates yet. Add one to start showing banners on the shop page." />
+      ) : (
+        <div className="space-y-3">
+          {templates.map((tpl) => (
+            <div
+              key={tpl._id}
+              className="flex items-center gap-4 bg-[#0a0a0b] border border-white/10 rounded-xl p-4"
+            >
+              <div className="h-10 w-10 shrink-0 rounded-lg bg-white/5 grid place-items-center">
+                <LayoutPreview layout={tpl.layout} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-white truncate">{tpl.name}</h4>
+                  <span
+                    className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      tpl.isActive
+                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                        : "bg-white/5 text-gray-500 border-white/10"
+                    }`}
+                  >
+                    {tpl.isActive ? "Live" : "Hidden"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {LAYOUT_TEMPLATES.find((l) => l.id === tpl.layout)?.label ?? tpl.layout} ·{" "}
+                  {POSITION_LABELS[tpl.position]} · Order {tpl.order}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => openEdit(tpl)}
+                  aria-label="Edit template"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onDelete(tpl)}
+                  aria-label="Delete template"
+                  className="text-red-400 hover:text-red-300 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <Modal title={editing ? "Edit template" : "Add template"} onClose={closeForm}>
+          <BannerTemplateForm initial={editing} submitting={submitting} onCancel={closeForm} onSubmit={handleSubmit} />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -1177,18 +1373,20 @@ function BannerLayoutPanel({
 
 function BannersSection({
   banners,
-  bannerSettings,
-  savingSettings,
-  onSaveSettings,
+  templates,
+  onCreateTemplate,
+  onUpdateTemplate,
+  onDeleteTemplate,
   onCreate,
   onUpdate,
   onDelete,
   onToggleActive,
 }: {
   banners: Banner[];
-  bannerSettings: BannerSettings;
-  savingSettings: boolean;
-  onSaveSettings: (values: BannerSettings) => Promise<void>;
+  templates: BannerTemplate[];
+  onCreateTemplate: (values: BannerTemplateFormValues) => Promise<void>;
+  onUpdateTemplate: (id: string, values: BannerTemplateFormValues) => Promise<void>;
+  onDeleteTemplate: (template: BannerTemplate) => Promise<void>;
   onCreate: (values: BannerFormValues) => Promise<void>;
   onUpdate: (id: string, values: BannerFormValues) => Promise<void>;
   onDelete: (banner: Banner) => Promise<void>;
@@ -1229,7 +1427,12 @@ function BannersSection({
 
   return (
     <div className="space-y-6">
-      <BannerLayoutPanel initial={bannerSettings} saving={savingSettings} onSave={onSaveSettings} />
+      <BannerTemplatesSection
+        templates={templates}
+        onCreate={onCreateTemplate}
+        onUpdate={onUpdateTemplate}
+        onDelete={onDeleteTemplate}
+      />
 
       <div className="flex items-center justify-between">
         <h2 className="text-sm text-gray-500">
@@ -1263,9 +1466,11 @@ function BannersSection({
                 <p className="text-xs text-gray-500 mt-1 truncate">
                   {banner.subtitle ? `${banner.subtitle} · ` : ""}Order {banner.order}
                   {banner.linkUrl ? ` · ${banner.linkUrl}` : ""} ·{" "}
-                  {banner.layouts && banner.layouts.length > 0
-                    ? banner.layouts.map((l) => LAYOUT_TEMPLATES.find((t) => t.id === l)?.label ?? l).join(", ")
-                    : "All layouts"}
+                  {banner.templateIds && banner.templateIds.length > 0
+                    ? banner.templateIds
+                        .map((id) => templates.find((t) => t._id === id)?.name ?? "Unknown template")
+                        .join(", ")
+                    : "All templates"}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -1298,7 +1503,13 @@ function BannersSection({
 
       {showForm && (
         <Modal title={editing ? "Edit banner" : "Add banner"} onClose={closeForm}>
-          <BannerForm initial={editing} submitting={submitting} onCancel={closeForm} onSubmit={handleSubmit} />
+          <BannerForm
+            initial={editing}
+            templates={templates}
+            submitting={submitting}
+            onCancel={closeForm}
+            onSubmit={handleSubmit}
+          />
         </Modal>
       )}
     </div>
@@ -1318,8 +1529,7 @@ export function AdminDashboard() {
   const [categories, setCategories] = useState<string[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
-  const [savingBannerSettings, setSavingBannerSettings] = useState(false);
+  const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>([]);
 
   const fetchMetrics = useCallback(async () => {
     const data = await apiFetch<Metrics>("/admin/metrics");
@@ -1345,9 +1555,9 @@ export function AdminDashboard() {
     const data = await apiFetch<Banner[]>("/admin/banners");
     setBanners(data);
   }, []);
-  const fetchBannerSettings = useCallback(async () => {
-    const data = await apiFetch<BannerSettings>("/admin/banner-settings");
-    setBannerSettings(data);
+  const fetchBannerTemplates = useCallback(async () => {
+    const data = await apiFetch<BannerTemplate[]>("/admin/banner-templates");
+    setBannerTemplates(data);
   }, []);
 
   useEffect(() => {
@@ -1362,7 +1572,7 @@ export function AdminDashboard() {
           fetchCategories(),
           fetchOrders(),
           fetchBanners(),
-          fetchBannerSettings(),
+          fetchBannerTemplates(),
         ]);
       } catch (err) {
         if (!cancelled) toast.error(errorMessage(err, "Failed to load admin dashboard"));
@@ -1467,16 +1677,35 @@ export function AdminDashboard() {
     }
   };
 
-  const handleSaveBannerSettings = async (values: BannerSettings) => {
-    setSavingBannerSettings(true);
+  const handleCreateBannerTemplate = async (values: BannerTemplateFormValues) => {
     try {
-      await apiFetch("/admin/banner-settings", { method: "PUT", body: values });
-      toast.success("Banner layout saved");
-      await fetchBannerSettings();
+      await apiFetch("/admin/banner-templates", { method: "POST", body: values });
+      toast.success("Template created");
+      await fetchBannerTemplates();
     } catch (err) {
-      toast.error(errorMessage(err, "Failed to save banner layout"));
-    } finally {
-      setSavingBannerSettings(false);
+      toast.error(errorMessage(err, "Failed to create template"));
+    }
+  };
+
+  const handleUpdateBannerTemplate = async (id: string, values: BannerTemplateFormValues) => {
+    try {
+      await apiFetch(`/admin/banner-templates/${id}`, { method: "PUT", body: values });
+      toast.success("Template updated");
+      await fetchBannerTemplates();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to update template"));
+    }
+  };
+
+  const handleDeleteBannerTemplate = async (template: BannerTemplate) => {
+    if (!window.confirm(`Delete "${template.name}"? Banners tagged to it will show in every remaining template instead.`))
+      return;
+    try {
+      await apiFetch(`/admin/banner-templates/${template._id}`, { method: "DELETE" });
+      toast.success("Template deleted");
+      await Promise.all([fetchBannerTemplates(), fetchBanners()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to delete template"));
     }
   };
 
@@ -1544,9 +1773,10 @@ export function AdminDashboard() {
           {activeTab === "banners" && (
             <BannersSection
               banners={banners}
-              bannerSettings={bannerSettings}
-              savingSettings={savingBannerSettings}
-              onSaveSettings={handleSaveBannerSettings}
+              templates={bannerTemplates}
+              onCreateTemplate={handleCreateBannerTemplate}
+              onUpdateTemplate={handleUpdateBannerTemplate}
+              onDeleteTemplate={handleDeleteBannerTemplate}
               onCreate={handleCreateBanner}
               onUpdate={handleUpdateBanner}
               onDelete={handleDeleteBanner}
