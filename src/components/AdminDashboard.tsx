@@ -120,8 +120,8 @@ interface BannerFormValues {
   templateIds: string[];
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight";
-type BannerPosition = "top" | "above-grid" | "bottom";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar";
+type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 
 interface BannerTemplateOptions {
   carousel: {
@@ -139,6 +139,10 @@ interface BannerTemplateOptions {
   spotlight: {
     maxListItems: number;
     showListSubtitle: boolean;
+  };
+  sidebar: {
+    autoAdvance: boolean;
+    intervalMs: number;
   };
 }
 
@@ -165,6 +169,7 @@ const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
   carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
   grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
   spotlight: { maxListItems: 4, showListSubtitle: false },
+  sidebar: { autoAdvance: true, intervalMs: 4000 },
 };
 
 type DiscountType = "percentage" | "fixed";
@@ -1053,6 +1058,7 @@ const LAYOUT_TEMPLATES: { id: BannerLayout; label: string; description: string }
   { id: "carousel", label: "Carousel", description: "One full-width banner at a time, auto-advancing." },
   { id: "grid", label: "Grid", description: "All active banners shown at once in a card grid." },
   { id: "spotlight", label: "Spotlight", description: "One featured banner with a list of others beside it." },
+  { id: "sidebar", label: "Sidebar", description: "Small auto-rotating banners fixed to the page's left and right margins." },
 ];
 
 function LayoutPreview({ layout }: { layout: BannerLayout }) {
@@ -1075,6 +1081,15 @@ function LayoutPreview({ layout }: { layout: BannerLayout }) {
           <div className="flex-1 rounded-md bg-white/20" />
           <div className="flex-1 rounded-md bg-white/20" />
         </div>
+      </div>
+    );
+  }
+  if (layout === "sidebar") {
+    return (
+      <div className="flex justify-between h-12 w-full">
+        <div className="w-3 rounded-md bg-white/20" />
+        <div className="flex-1" />
+        <div className="w-3 rounded-md bg-white/20" />
       </div>
     );
   }
@@ -1133,6 +1148,8 @@ function BannerTemplateForm({
     setOptions((prev) => ({ ...prev, grid: { ...prev.grid, ...patch } }));
   const updateSpotlight = (patch: Partial<BannerTemplateOptions["spotlight"]>) =>
     setOptions((prev) => ({ ...prev, spotlight: { ...prev.spotlight, ...patch } }));
+  const updateSidebar = (patch: Partial<BannerTemplateOptions["sidebar"]>) =>
+    setOptions((prev) => ({ ...prev, sidebar: { ...prev.sidebar, ...patch } }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1143,7 +1160,7 @@ function BannerTemplateForm({
     onSubmit({
       name: name.trim(),
       layout,
-      position,
+      position: layout === "sidebar" ? "sidebar" : position,
       isActive,
       order: Number.parseInt(order, 10) || 0,
       options,
@@ -1165,7 +1182,7 @@ function BannerTemplateForm({
 
       <div>
         <label className="text-xs text-gray-500 mb-1.5 block">Layout</label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {LAYOUT_TEMPLATES.map((tpl) => (
             <button
               type="button"
@@ -1184,18 +1201,27 @@ function BannerTemplateForm({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
-          <SegmentedControl
-            value={position}
-            onChange={setPosition}
-            options={[
-              { value: "top", label: "Top of page" },
-              { value: "above-grid", label: "Above products" },
-              { value: "bottom", label: "Bottom of page" },
-            ]}
-          />
-        </div>
+        {layout === "sidebar" ? (
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
+            <p className="text-sm text-gray-400 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              Fixed to the page&apos;s left and right margins
+            </p>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
+            <SegmentedControl
+              value={position as "top" | "above-grid" | "bottom"}
+              onChange={setPosition}
+              options={[
+                { value: "top", label: "Top of page" },
+                { value: "above-grid", label: "Above products" },
+                { value: "bottom", label: "Bottom of page" },
+              ]}
+            />
+          </div>
+        )}
         <div>
           <label className="text-xs text-gray-500 mb-1.5 block">Order within position</label>
           <input
@@ -1340,6 +1366,39 @@ function BannerTemplateForm({
         </div>
       )}
 
+      {layout === "sidebar" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Tag as many banners to this template as you like below — the left and right rails will cycle
+            through all of them.
+          </p>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.sidebar.autoAdvance}
+              onChange={(e) => updateSidebar({ autoAdvance: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Auto-advance</span>
+          </label>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+            <input
+              type="number"
+              min={2}
+              max={15}
+              value={Math.round(options.sidebar.intervalMs / 1000)}
+              onChange={(e) => {
+                const seconds = Number.parseInt(e.target.value, 10);
+                const clamped = Number.isFinite(seconds) ? Math.min(15, Math.max(2, seconds)) : 4;
+                updateSidebar({ intervalMs: clamped * 1000 });
+              }}
+              className={inputClass}
+            />
+          </div>
+        </div>
+      )}
+
       <label className="flex items-center gap-3 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -1408,6 +1467,7 @@ function BannerTemplatesSection({
     top: "Top of page",
     "above-grid": "Above products",
     bottom: "Bottom of page",
+    sidebar: "Page sides (left + right)",
   };
 
   return (

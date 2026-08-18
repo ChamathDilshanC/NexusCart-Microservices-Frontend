@@ -50,8 +50,8 @@ function bannerHref(banner: Banner): string | undefined {
   return banner.productId ? `/product/${banner.productId}` : banner.linkUrl || undefined;
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight";
-type BannerPosition = "top" | "above-grid" | "bottom";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar";
+type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 
 interface BannerTemplateOptions {
   carousel: {
@@ -69,6 +69,10 @@ interface BannerTemplateOptions {
   spotlight: {
     maxListItems: number;
     showListSubtitle: boolean;
+  };
+  sidebar: {
+    autoAdvance: boolean;
+    intervalMs: number;
   };
 }
 
@@ -231,7 +235,12 @@ function ShopContent() {
   // template renders simultaneously, each showing only its own tagged banners
   // (an untagged banner — no templateIds, or an empty list — shows under all of them).
   const templatesByPosition = useMemo(() => {
-    const grouped: Record<BannerPosition, BannerTemplate[]> = { top: [], "above-grid": [], bottom: [] };
+    const grouped: Record<BannerPosition, BannerTemplate[]> = {
+      top: [],
+      "above-grid": [],
+      bottom: [],
+      sidebar: [],
+    };
     for (const tpl of bannerTemplates) {
       if (!tpl.isActive) continue;
       grouped[tpl.position]?.push(tpl);
@@ -245,15 +254,19 @@ function ShopContent() {
   const bannersForTemplate = (template: BannerTemplate) =>
     banners.filter((b) => !b.templateIds || b.templateIds.length === 0 || b.templateIds.includes(template._id));
 
-  const renderTemplateGroup = (position: BannerPosition) => {
+  const getBlocksForPosition = (position: BannerPosition) => {
     const list = templatesByPosition[position];
-    if (!list || list.length === 0) return null;
-    const blocks = list
+    if (!list || list.length === 0) return [];
+    return list
       .map((tpl) => {
         const tplBanners = bannersForTemplate(tpl);
         return tplBanners.length > 0 ? { tpl, tplBanners } : null;
       })
       .filter((b): b is { tpl: BannerTemplate; tplBanners: Banner[] } => b !== null);
+  };
+
+  const renderTemplateGroup = (position: BannerPosition) => {
+    const blocks = getBlocksForPosition(position);
     if (blocks.length === 0) return null;
     return (
       <div className="flex flex-col gap-4">
@@ -267,6 +280,7 @@ function ShopContent() {
   const topSection = renderTemplateGroup("top");
   const aboveGridSection = renderTemplateGroup("above-grid");
   const bottomSection = renderTemplateGroup("bottom");
+  const sidebarBlocks = getBlocksForPosition("sidebar");
 
   const onSaleProducts = useMemo(
     () => products.filter((p) => p.discountPercent && p.discountPercent > 0).slice(0, 8),
@@ -336,6 +350,8 @@ function ShopContent() {
 
   return (
     <>
+      <SidebarRails blocks={sidebarBlocks} />
+
       {topSection}
 
       <div className="max-w-7xl mx-auto px-6 py-10">
@@ -593,6 +609,64 @@ function BannerBlock({ template, banners }: { template: BannerTemplate; banners:
     return <BannerSpotlight banners={banners} options={template.options.spotlight} />;
   }
   return <BannerCarousel banners={banners} options={template.options.carousel} />;
+}
+
+/* ---------------------------- Sidebar rails ---------------------------- */
+
+function SidebarRails({ blocks }: { blocks: { tpl: BannerTemplate; tplBanners: Banner[] }[] }) {
+  if (blocks.length === 0) return null;
+  return (
+    <>
+      <div className="hidden 2xl:flex flex-col gap-4 fixed left-6 top-28 z-20 w-48">
+        {blocks.map(({ tpl, tplBanners }) => (
+          <SidebarCarousel key={tpl._id} banners={tplBanners} options={tpl.options.sidebar} />
+        ))}
+      </div>
+      <div className="hidden 2xl:flex flex-col gap-4 fixed right-6 top-28 z-20 w-48">
+        {blocks.map(({ tpl, tplBanners }) => (
+          <SidebarCarousel key={tpl._id} banners={tplBanners} options={tpl.options.sidebar} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function SidebarCarousel({
+  banners,
+  options,
+}: {
+  banners: Banner[];
+  options: BannerTemplateOptions["sidebar"];
+}) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex((i) => (banners.length === 0 ? 0 : i % banners.length));
+  }, [banners.length]);
+
+  useEffect(() => {
+    if (!options.autoAdvance || banners.length <= 1) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % banners.length);
+    }, options.intervalMs);
+    return () => clearInterval(id);
+  }, [banners.length, options.autoAdvance, options.intervalMs]);
+
+  if (banners.length === 0) return null;
+  const banner = banners[index];
+  const href = bannerHref(banner);
+
+  const content = (
+    <div className="relative w-full aspect-[3/4] rounded-xl overflow-hidden bg-[#111113] border border-white/10">
+      <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <p className="text-xs font-semibold text-white leading-tight line-clamp-2">{banner.title}</p>
+      </div>
+    </div>
+  );
+
+  return href ? <a href={href}>{content}</a> : content;
 }
 
 /* ---------------------------- Banner carousel ---------------------------- */
