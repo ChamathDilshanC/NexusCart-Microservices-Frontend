@@ -107,9 +107,11 @@ interface BannerFormValues {
 }
 
 type BannerLayout = "carousel" | "grid" | "spotlight";
+type BannerPosition = "top" | "above-grid" | "bottom";
 
 interface BannerSettings {
   layout: BannerLayout;
+  position: BannerPosition;
   options: {
     carousel: {
       autoAdvance: boolean;
@@ -132,6 +134,7 @@ interface BannerSettings {
 
 const DEFAULT_BANNER_SETTINGS: BannerSettings = {
   layout: "carousel",
+  position: "top",
   options: {
     carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
     grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
@@ -788,6 +791,23 @@ function OrdersSection({
                   </div>
                 </div>
 
+                <div className="space-y-2 mb-4">
+                  {order.items.map((item, idx) => (
+                    <div key={`${item.productId}-${idx}`} className="flex items-center gap-3">
+                      <Thumbnail src={item.imageUrl} alt={item.name} size="h-10 w-10" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white truncate">{item.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {item.quantity} × {formatCurrency(item.price)}
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-300 shrink-0">
+                        {formatCurrency(item.quantity * item.price)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 {address && <p className="text-xs text-gray-500 mb-4">{address}</p>}
 
                 <div className="flex items-center justify-between gap-4 pt-4 border-t border-white/5">
@@ -956,6 +976,19 @@ function BannerLayoutPanel({
             <div className="text-xs text-gray-500 mt-1">{tpl.description}</div>
           </button>
         ))}
+      </div>
+
+      <div className="mb-6">
+        <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
+        <SegmentedControl
+          value={settings.position}
+          onChange={(v) => setSettings((prev) => ({ ...prev, position: v }))}
+          options={[
+            { value: "top", label: "Top of page" },
+            { value: "above-grid", label: "Above products" },
+            { value: "bottom", label: "Bottom of page" },
+          ]}
+        />
       </div>
 
       {settings.layout === "carousel" && (

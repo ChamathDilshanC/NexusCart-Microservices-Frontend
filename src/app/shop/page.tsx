@@ -42,9 +42,11 @@ interface Banner {
 }
 
 type BannerLayout = "carousel" | "grid" | "spotlight";
+type BannerPosition = "top" | "above-grid" | "bottom";
 
 interface BannerSettings {
   layout: BannerLayout;
+  position: BannerPosition;
   options: {
     carousel: {
       autoAdvance: boolean;
@@ -67,6 +69,7 @@ interface BannerSettings {
 
 const DEFAULT_BANNER_SETTINGS: BannerSettings = {
   layout: "carousel",
+  position: "top",
   options: {
     carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
     grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
@@ -253,24 +256,25 @@ function ShopContent() {
     (priceMax.trim() !== "" ? 1 : 0) +
     (search.trim() !== "" ? 1 : 0);
 
+  const bannerSection =
+    banners.length > 0 ? (
+      bannerSettings.layout === "grid" ? (
+        <BannerGrid banners={banners} options={bannerSettings.options.grid} />
+      ) : bannerSettings.layout === "spotlight" ? (
+        <BannerSpotlight banners={banners} options={bannerSettings.options.spotlight} />
+      ) : (
+        <BannerCarousel
+          banners={banners}
+          index={bannerIndex}
+          onIndexChange={setBannerIndex}
+          options={bannerSettings.options.carousel}
+        />
+      )
+    ) : null;
+
   return (
     <>
-      {banners.length > 0 && (
-        <>
-          {bannerSettings.layout === "grid" ? (
-            <BannerGrid banners={banners} options={bannerSettings.options.grid} />
-          ) : bannerSettings.layout === "spotlight" ? (
-            <BannerSpotlight banners={banners} options={bannerSettings.options.spotlight} />
-          ) : (
-            <BannerCarousel
-              banners={banners}
-              index={bannerIndex}
-              onIndexChange={setBannerIndex}
-              options={bannerSettings.options.carousel}
-            />
-          )}
-        </>
-      )}
+      {bannerSettings.position === "top" && bannerSection}
 
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
@@ -305,6 +309,8 @@ function ShopContent() {
             )}
           </button>
         </div>
+
+        {bannerSettings.position === "above-grid" && <div className="mb-8">{bannerSection}</div>}
 
         <div className="grid lg:grid-cols-4 gap-8">
           <aside className={`${filtersOpen ? "block" : "hidden"} lg:block lg:col-span-1`}>
@@ -457,6 +463,8 @@ function ShopContent() {
             )}
           </section>
         </div>
+
+        {bannerSettings.position === "bottom" && <div className="mt-10">{bannerSection}</div>}
       </div>
     </>
   );
