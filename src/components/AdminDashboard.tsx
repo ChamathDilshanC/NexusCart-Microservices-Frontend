@@ -84,6 +84,7 @@ interface Banner {
   linkUrl?: string;
   order: number;
   isActive: boolean;
+  layouts?: BannerLayout[];
 }
 
 interface ProductFormValues {
@@ -104,6 +105,7 @@ interface BannerFormValues {
   linkUrl: string;
   order: number;
   isActive: boolean;
+  layouts: BannerLayout[];
 }
 
 type BannerLayout = "carousel" | "grid" | "spotlight";
@@ -368,11 +370,13 @@ function ImageField({
 
 function ProductForm({
   initial,
+  categories,
   submitting,
   onCancel,
   onSubmit,
 }: {
   initial: Product | null;
+  categories: string[];
   submitting: boolean;
   onCancel: () => void;
   onSubmit: (values: ProductFormValues) => void;
@@ -417,11 +421,17 @@ function ProductForm({
           <label className="text-xs text-gray-500 mb-1.5 block">Category</label>
           <input
             required
+            list="product-category-options"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             placeholder="e.g. Electronics"
             className={inputClass}
           />
+          <datalist id="product-category-options">
+            {categories.map((cat) => (
+              <option key={cat} value={cat} />
+            ))}
+          </datalist>
         </div>
       </div>
 
@@ -539,7 +549,12 @@ function BannerForm({
   const [order, setOrder] = useState(initial ? String(initial.order) : "0");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
+  const [layouts, setLayouts] = useState<BannerLayout[]>(initial?.layouts ?? []);
   const toast = useToast();
+
+  const toggleLayout = (id: BannerLayout) => {
+    setLayouts((prev) => (prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id]));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -554,6 +569,7 @@ function BannerForm({
       order: Number.parseInt(order, 10) || 0,
       isActive,
       imageUrl: imageUrl.trim(),
+      layouts,
     });
   };
 
@@ -608,6 +624,24 @@ function BannerForm({
         <ImageField value={imageUrl} onChange={setImageUrl} />
       </div>
 
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Show in layouts</label>
+        <div className="flex flex-wrap gap-4">
+          {LAYOUT_TEMPLATES.map((tpl) => (
+            <label key={tpl.id} className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={layouts.includes(tpl.id)}
+                onChange={() => toggleLayout(tpl.id)}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">{tpl.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-gray-600 mt-1.5">Leave all unchecked to show in every layout.</p>
+      </div>
+
       <label className="flex items-center gap-3 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -634,11 +668,13 @@ function BannerForm({
 
 function ProductsSection({
   products,
+  categories,
   onCreate,
   onUpdate,
   onDelete,
 }: {
   products: Product[];
+  categories: string[];
   onCreate: (values: ProductFormValues) => Promise<void>;
   onUpdate: (id: string, values: ProductFormValues) => Promise<void>;
   onDelete: (product: Product) => Promise<void>;
@@ -732,7 +768,13 @@ function ProductsSection({
 
       {showForm && (
         <Modal title={editing ? "Edit product" : "Add product"} onClose={closeForm}>
-          <ProductForm initial={editing} submitting={submitting} onCancel={closeForm} onSubmit={handleSubmit} />
+          <ProductForm
+            initial={editing}
+            categories={categories}
+            submitting={submitting}
+            onCancel={closeForm}
+            onSubmit={handleSubmit}
+          />
         </Modal>
       )}
     </div>
@@ -1220,7 +1262,10 @@ function BannersSection({
                 </div>
                 <p className="text-xs text-gray-500 mt-1 truncate">
                   {banner.subtitle ? `${banner.subtitle} · ` : ""}Order {banner.order}
-                  {banner.linkUrl ? ` · ${banner.linkUrl}` : ""}
+                  {banner.linkUrl ? ` · ${banner.linkUrl}` : ""} ·{" "}
+                  {banner.layouts && banner.layouts.length > 0
+                    ? banner.layouts.map((l) => LAYOUT_TEMPLATES.find((t) => t.id === l)?.label ?? l).join(", ")
+                    : "All layouts"}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -1270,6 +1315,7 @@ export function AdminDashboard() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
@@ -1286,6 +1332,10 @@ export function AdminDashboard() {
   const fetchProducts = useCallback(async () => {
     const data = await apiFetch<Product[]>("/admin/products");
     setProducts(data);
+  }, []);
+  const fetchCategories = useCallback(async () => {
+    const data = await apiFetch<string[]>("/products/categories");
+    setCategories(data);
   }, []);
   const fetchOrders = useCallback(async () => {
     const data = await apiFetch<Order[]>("/admin/orders");
@@ -1309,6 +1359,7 @@ export function AdminDashboard() {
           fetchMetrics(),
           fetchUsers(),
           fetchProducts(),
+          fetchCategories(),
           fetchOrders(),
           fetchBanners(),
           fetchBannerSettings(),
@@ -1331,7 +1382,7 @@ export function AdminDashboard() {
     try {
       await apiFetch("/admin/products", { method: "POST", body: values });
       toast.success("Product created");
-      await Promise.all([fetchProducts(), fetchMetrics()]);
+      await Promise.all([fetchProducts(), fetchMetrics(), fetchCategories()]);
     } catch (err) {
       toast.error(errorMessage(err, "Failed to create product"));
     }
@@ -1341,7 +1392,7 @@ export function AdminDashboard() {
     try {
       await apiFetch(`/admin/products/${id}`, { method: "PUT", body: values });
       toast.success("Product updated");
-      await fetchProducts();
+      await Promise.all([fetchProducts(), fetchCategories()]);
     } catch (err) {
       toast.error(errorMessage(err, "Failed to update product"));
     }
@@ -1482,6 +1533,7 @@ export function AdminDashboard() {
           {activeTab === "products" && (
             <ProductsSection
               products={products}
+              categories={categories}
               onCreate={handleCreateProduct}
               onUpdate={handleUpdateProduct}
               onDelete={handleDeleteProduct}

@@ -39,6 +39,7 @@ interface Banner {
   linkUrl?: string;
   order: number;
   isActive: boolean;
+  layouts?: BannerLayout[];
 }
 
 type BannerLayout = "carousel" | "grid" | "spotlight";
@@ -202,16 +203,34 @@ function ShopContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, selectedCategories.join(","), sort, priceMin, priceMax, availability.join(",")]);
 
+  // Banners tagged for a specific layout only show when that layout is active;
+  // an untagged banner (no layouts, or an empty list) shows under every layout.
+  const visibleBanners = useMemo(
+    () =>
+      banners.filter((b) => !b.layouts || b.layouts.length === 0 || b.layouts.includes(bannerSettings.layout)),
+    [banners, bannerSettings.layout]
+  );
+
+  // Keep the carousel index in range whenever the visible set changes (e.g. layout switch).
+  useEffect(() => {
+    setBannerIndex((i) => (visibleBanners.length === 0 ? 0 : i % visibleBanners.length));
+  }, [visibleBanners.length]);
+
   // Banner auto-advance (carousel layout only).
   useEffect(() => {
     if (bannerSettings.layout !== "carousel") return;
     if (!bannerSettings.options.carousel.autoAdvance) return;
-    if (banners.length <= 1) return;
+    if (visibleBanners.length <= 1) return;
     const id = setInterval(() => {
-      setBannerIndex((i) => (i + 1) % banners.length);
+      setBannerIndex((i) => (i + 1) % visibleBanners.length);
     }, bannerSettings.options.carousel.intervalMs);
     return () => clearInterval(id);
-  }, [banners.length, bannerSettings.layout, bannerSettings.options.carousel.autoAdvance, bannerSettings.options.carousel.intervalMs]);
+  }, [
+    visibleBanners.length,
+    bannerSettings.layout,
+    bannerSettings.options.carousel.autoAdvance,
+    bannerSettings.options.carousel.intervalMs,
+  ]);
 
   const filteredProducts = useMemo(() => {
     const min = priceMin.trim() === "" ? null : Number(priceMin);
@@ -257,14 +276,14 @@ function ShopContent() {
     (search.trim() !== "" ? 1 : 0);
 
   const bannerSection =
-    banners.length > 0 ? (
+    visibleBanners.length > 0 ? (
       bannerSettings.layout === "grid" ? (
-        <BannerGrid banners={banners} options={bannerSettings.options.grid} />
+        <BannerGrid banners={visibleBanners} options={bannerSettings.options.grid} />
       ) : bannerSettings.layout === "spotlight" ? (
-        <BannerSpotlight banners={banners} options={bannerSettings.options.spotlight} />
+        <BannerSpotlight banners={visibleBanners} options={bannerSettings.options.spotlight} />
       ) : (
         <BannerCarousel
-          banners={banners}
+          banners={visibleBanners}
           index={bannerIndex}
           onIndexChange={setBannerIndex}
           options={bannerSettings.options.carousel}
