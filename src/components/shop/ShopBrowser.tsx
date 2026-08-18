@@ -49,7 +49,7 @@ function bannerHref(banner: Banner): string | undefined {
   return banner.productId ? `/product/${banner.productId}` : banner.linkUrl || undefined;
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 
 interface BannerTemplateOptions {
@@ -72,6 +72,11 @@ interface BannerTemplateOptions {
   sidebar: {
     autoAdvance: boolean;
     intervalMs: number;
+  };
+  showcase: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
   };
 }
 
@@ -160,23 +165,28 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   // as its own section instead of one flat paginated grid; /shop always stays flat.
   const isFlatMode = alwaysFlat || search.trim() !== "" || selectedCategories.length > 0;
 
-  // Fetch categories + banners + banner templates once.
+  // Fetch categories always; banners/templates only on /shop (alwaysFlat) —
+  // /shop/allitems is a plain category directory and shouldn't show them.
   useEffect(() => {
     (async () => {
       try {
-        const [cats, bnrs, tpls] = await Promise.all([
-          apiFetch<string[]>("/products/categories", { auth: false }),
-          apiFetch<Banner[]>("/products/banners", { auth: false }),
-          apiFetch<BannerTemplate[]>("/products/banner-templates", { auth: false }).catch(() => []),
-        ]);
-        setCategories(cats);
-        setBanners(bnrs);
-        setBannerTemplates(tpls);
+        if (alwaysFlat) {
+          const [cats, bnrs, tpls] = await Promise.all([
+            apiFetch<string[]>("/products/categories", { auth: false }),
+            apiFetch<Banner[]>("/products/banners", { auth: false }),
+            apiFetch<BannerTemplate[]>("/products/banner-templates", { auth: false }).catch(() => []),
+          ]);
+          setCategories(cats);
+          setBanners(bnrs);
+          setBannerTemplates(tpls);
+        } else {
+          setCategories(await apiFetch<string[]>("/products/categories", { auth: false }));
+        }
       } catch {
         // Non-fatal: filters/banner section simply stay empty.
       }
     })();
-  }, []);
+  }, [alwaysFlat]);
 
   // Debounced product fetch on search/category/sort/page change. When no
   // search/category filter is active (and alwaysFlat is off) we fetch the
@@ -615,7 +625,116 @@ function BannerBlock({ template, banners }: { template: BannerTemplate; banners:
   if (template.layout === "spotlight") {
     return <BannerSpotlight banners={banners} options={template.options.spotlight} />;
   }
+  if (template.layout === "showcase") {
+    return <BannerShowcase banners={banners} options={template.options.showcase} />;
+  }
   return <BannerCarousel banners={banners} options={template.options.carousel} />;
+}
+
+/* ---------------------------- Banner showcase ---------------------------- */
+
+const SHOWCASE_HEIGHT = "h-[220px] md:h-[320px]";
+
+function BannerShowcase({
+  banners,
+  options,
+}: {
+  banners: Banner[];
+  options: BannerTemplateOptions["showcase"];
+}) {
+  const sorted = useMemo(() => [...banners].sort((a, b) => a.order - b.order), [banners]);
+  const [step, setStep] = useState(0);
+  const visibleCount = Math.min(4, sorted.length);
+
+  useEffect(() => {
+    setStep((s) => (sorted.length === 0 ? 0 : s % sorted.length));
+  }, [sorted.length]);
+
+  useEffect(() => {
+    if (!options.autoAdvance || sorted.length <= visibleCount) return;
+    const id = setInterval(() => {
+      setStep((s) => (s + 1) % sorted.length);
+    }, options.intervalMs);
+    return () => clearInterval(id);
+  }, [sorted.length, visibleCount, options.autoAdvance, options.intervalMs]);
+
+  if (sorted.length === 0) return null;
+
+  const slots = Array.from({ length: visibleCount }, (_, i) => sorted[(step + i) % sorted.length]);
+  // With 4+ banners the two centered slots read as "large"; anything shown
+  // with fewer than 4 just fills the row evenly.
+  const isLargeSlot = (i: number) => visibleCount < 4 || i === 1 || i === 2;
+
+  const advance = (delta: number) => setStep((s) => (s + delta + sorted.length) % sorted.length);
+
+  return (
+    <div className="relative max-w-7xl mx-auto px-6 py-8">
+      <div className={`flex items-stretch gap-3 md:gap-4 ${SHOWCASE_HEIGHT}`}>
+        {slots.map((banner, i) => (
+          <ShowcaseCard key={`${banner._id}-${i}`} banner={banner} large={isLargeSlot(i)} />
+        ))}
+      </div>
+
+      {options.showArrows && sorted.length > visibleCount && (
+        <>
+          <button
+            onClick={() => advance(-1)}
+            aria-label="Previous"
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => advance(1)}
+            aria-label="Next"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ShowcaseCard({ banner, large }: { banner: Banner; large: boolean }) {
+  const href = bannerHref(banner);
+  const content = (
+    <div
+      className={`group relative h-full overflow-hidden rounded-2xl bg-[#111113] border border-white/10 ${
+        large ? "flex-[2]" : "flex-1"
+      }`}
+    >
+      <img
+        src={banner.imageUrl}
+        alt={banner.title}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3 md:p-5">
+        <h3
+          className={`font-semibold text-white tracking-tight leading-tight line-clamp-2 ${
+            large ? "text-base md:text-2xl" : "text-xs md:text-sm"
+          }`}
+        >
+          {banner.title}
+        </h3>
+        {large && banner.subtitle && (
+          <p className="hidden md:block text-sm text-gray-300 mt-1.5 max-w-md line-clamp-2">
+            {banner.subtitle}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  return href ? (
+    <a href={href} className={`block h-full ${large ? "flex-[2]" : "flex-1"}`}>
+      {content}
+    </a>
+  ) : (
+    content
+  );
 }
 
 /* ---------------------------- Sidebar rails ---------------------------- */

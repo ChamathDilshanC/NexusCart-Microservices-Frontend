@@ -120,7 +120,7 @@ interface BannerFormValues {
   templateIds: string[];
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 
 interface BannerTemplateOptions {
@@ -143,6 +143,11 @@ interface BannerTemplateOptions {
   sidebar: {
     autoAdvance: boolean;
     intervalMs: number;
+  };
+  showcase: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
   };
 }
 
@@ -170,6 +175,7 @@ const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
   grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
   spotlight: { maxListItems: 4, showListSubtitle: false },
   sidebar: { autoAdvance: true, intervalMs: 4000 },
+  showcase: { autoAdvance: true, intervalMs: 5000, showArrows: true },
 };
 
 type DiscountType = "percentage" | "fixed";
@@ -1059,6 +1065,7 @@ const LAYOUT_TEMPLATES: { id: BannerLayout; label: string; description: string }
   { id: "grid", label: "Grid", description: "All active banners shown at once in a card grid." },
   { id: "spotlight", label: "Spotlight", description: "One featured banner with a list of others beside it." },
   { id: "sidebar", label: "Sidebar", description: "Small auto-rotating banners fixed to the page's left and right margins." },
+  { id: "showcase", label: "Showcase", description: "A row with two large banners in the center and smaller ones peeking at each side." },
 ];
 
 function LayoutPreview({ layout }: { layout: BannerLayout }) {
@@ -1093,6 +1100,16 @@ function LayoutPreview({ layout }: { layout: BannerLayout }) {
       </div>
     );
   }
+  if (layout === "showcase") {
+    return (
+      <div className="flex items-center gap-1 h-12 w-full">
+        <div className="w-3 h-8 rounded-md bg-white/20" />
+        <div className="flex-1 h-full rounded-md bg-white/20" />
+        <div className="flex-1 h-full rounded-md bg-white/20" />
+        <div className="w-3 h-8 rounded-md bg-white/20" />
+      </div>
+    );
+  }
   return <div className="h-12 w-full rounded-md bg-white/20" />;
 }
 
@@ -1123,6 +1140,50 @@ function SegmentedControl<T extends string | number>({
   );
 }
 
+// A number input that lets you freely type/clear the field — clamping only
+// happens once you leave it, instead of on every keystroke (which used to
+// snap the value back mid-type and made it impossible to enter anything
+// below the minimum, e.g. typing "10" when min is 2).
+function ClampedNumberInput({
+  value,
+  min,
+  max,
+  fallback,
+  onCommit,
+  className,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  fallback: number;
+  onCommit: (n: number) => void;
+  className?: string;
+}) {
+  const [text, setText] = useState(String(value));
+
+  const commit = () => {
+    const parsed = Number.parseInt(text, 10);
+    const clamped = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+    setText(String(clamped));
+    onCommit(clamped);
+  };
+
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      className={className}
+    />
+  );
+}
+
 function BannerTemplateForm({
   initial,
   submitting,
@@ -1150,6 +1211,8 @@ function BannerTemplateForm({
     setOptions((prev) => ({ ...prev, spotlight: { ...prev.spotlight, ...patch } }));
   const updateSidebar = (patch: Partial<BannerTemplateOptions["sidebar"]>) =>
     setOptions((prev) => ({ ...prev, sidebar: { ...prev.sidebar, ...patch } }));
+  const updateShowcase = (patch: Partial<BannerTemplateOptions["showcase"]>) =>
+    setOptions((prev) => ({ ...prev, showcase: { ...prev.showcase, ...patch } }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1182,7 +1245,7 @@ function BannerTemplateForm({
 
       <div>
         <label className="text-xs text-gray-500 mb-1.5 block">Layout</label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {LAYOUT_TEMPLATES.map((tpl) => (
             <button
               type="button"
@@ -1249,16 +1312,12 @@ function BannerTemplateForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
-              <input
-                type="number"
+              <ClampedNumberInput
                 min={2}
                 max={10}
+                fallback={5}
                 value={Math.round(options.carousel.intervalMs / 1000)}
-                onChange={(e) => {
-                  const seconds = Number.parseInt(e.target.value, 10);
-                  const clamped = Number.isFinite(seconds) ? Math.min(10, Math.max(2, seconds)) : 5;
-                  updateCarousel({ intervalMs: clamped * 1000 });
-                }}
+                onCommit={(seconds) => updateCarousel({ intervalMs: seconds * 1000 })}
                 className={inputClass}
               />
             </div>
@@ -1341,16 +1400,12 @@ function BannerTemplateForm({
         <div className="space-y-4">
           <div className="max-w-xs">
             <label className="text-xs text-gray-500 mb-1.5 block">Max list items</label>
-            <input
-              type="number"
+            <ClampedNumberInput
               min={1}
               max={8}
+              fallback={4}
               value={options.spotlight.maxListItems}
-              onChange={(e) => {
-                const value = Number.parseInt(e.target.value, 10);
-                const clamped = Number.isFinite(value) ? Math.min(8, Math.max(1, value)) : 4;
-                updateSpotlight({ maxListItems: clamped });
-              }}
+              onCommit={(value) => updateSpotlight({ maxListItems: value })}
               className={inputClass}
             />
           </div>
@@ -1383,19 +1438,55 @@ function BannerTemplateForm({
           </label>
           <div className="max-w-xs">
             <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
-            <input
-              type="number"
+            <ClampedNumberInput
               min={2}
               max={15}
+              fallback={4}
               value={Math.round(options.sidebar.intervalMs / 1000)}
-              onChange={(e) => {
-                const seconds = Number.parseInt(e.target.value, 10);
-                const clamped = Number.isFinite(seconds) ? Math.min(15, Math.max(2, seconds)) : 4;
-                updateSidebar({ intervalMs: clamped * 1000 });
-              }}
+              onCommit={(seconds) => updateSidebar({ intervalMs: seconds * 1000 })}
               className={inputClass}
             />
           </div>
+        </div>
+      )}
+
+      {layout === "showcase" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Tag 4 or more banners to this template — two show large in the center, the rest peek at the
+            edges. Arrows (or auto-advance) slide the row by one banner at a time.
+          </p>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.showcase.autoAdvance}
+              onChange={(e) => updateShowcase({ autoAdvance: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Auto-advance</span>
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+              <ClampedNumberInput
+                min={2}
+                max={10}
+                fallback={5}
+                value={Math.round(options.showcase.intervalMs / 1000)}
+                onCommit={(seconds) => updateShowcase({ intervalMs: seconds * 1000 })}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.showcase.showArrows}
+              onChange={(e) => updateShowcase({ showArrows: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Show arrows</span>
+          </label>
         </div>
       )}
 

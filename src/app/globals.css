@@ -9,6 +9,18 @@
     background-color: #000;
     color: #fff;
   }
+
+  /* Hide the native up/down spinner on every number input — it steals scroll
+     and click events from the field and gets in the way of typing. */
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 }
 
 @keyframes marquee {
