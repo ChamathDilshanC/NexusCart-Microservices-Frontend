@@ -792,6 +792,11 @@ function SidebarRails({ blocks }: { blocks: { tpl: BannerTemplate; tplBanners: B
   );
 }
 
+// Three stacked slots per rail, each showing a different banner from the
+// pool at once; they all advance together so the rail always has three
+// distinct banners on screen instead of one box cycling alone.
+const SIDEBAR_SLOT_COUNT = 3;
+
 function SidebarCarousel({
   banners,
   options,
@@ -802,26 +807,32 @@ function SidebarCarousel({
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    setIndex((i) => (banners.length === 0 ? 0 : i % banners.length));
-  }, [banners.length]);
-
-  useEffect(() => {
     if (!options.autoAdvance || banners.length <= 1) return;
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % banners.length);
+      setIndex((i) => i + 1);
     }, options.intervalMs);
     return () => clearInterval(id);
   }, [banners.length, options.autoAdvance, options.intervalMs]);
 
   if (banners.length === 0) return null;
-  const banner = banners[index];
-  const href = bannerHref(banner);
 
+  const slotCount = Math.min(SIDEBAR_SLOT_COUNT, banners.length);
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {Array.from({ length: slotCount }, (_, slot) => (
+        <SidebarSlot key={slot} banner={banners[mod(index + slot, banners.length)]} />
+      ))}
+    </div>
+  );
+}
+
+function SidebarSlot({ banner }: { banner: Banner }) {
+  const href = bannerHref(banner);
   const content = (
-    <div className="relative w-full aspect-[3/4] rounded-xl overflow-hidden bg-[#111113] border border-white/10">
+    <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#111113] border border-white/10">
       <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-      <div className="absolute bottom-0 left-0 right-0 p-3">
+      <div className="absolute bottom-0 left-0 right-0 p-2.5">
         <p className="text-xs font-semibold text-white leading-tight line-clamp-2">{banner.title}</p>
       </div>
     </div>
