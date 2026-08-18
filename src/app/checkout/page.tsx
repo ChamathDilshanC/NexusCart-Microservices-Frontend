@@ -128,7 +128,12 @@ export default function CheckoutPage() {
 
       const res = await apiFetch<OrderResponse>("/orders", {
         method: "POST",
-        body: { items: orderItems, shippingAddress },
+        body: {
+          items: orderItems,
+          shippingAddress,
+          customerEmail: currentUser?.email,
+          customerName: currentUser?.name,
+        },
       });
 
       const createdOrder = res.order;

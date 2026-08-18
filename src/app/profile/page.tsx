@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Mail, MapPin, PackageOpen, ShoppingBag } from "lucide-react";
+import { Loader2, Mail, MapPin, PackageOpen, ShoppingBag, Receipt } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -218,12 +218,22 @@ export default function ProfilePage() {
                       ))}
                     </div>
 
-                    {order.shippingAddress && (
-                      <div className="flex items-center gap-2 text-xs text-gray-500 pt-3 border-t border-white/5">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
-                        <span>{formatAddress(order.shippingAddress)}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/5">
+                      {order.shippingAddress ? (
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                          <span>{formatAddress(order.shippingAddress)}</span>
+                        </div>
+                      ) : (
+                        <span />
+                      )}
+                      <Link
+                        href={`/orders/${order._id}/invoice`}
+                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors shrink-0"
+                      >
+                        <Receipt className="w-3.5 h-3.5" /> View invoice
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>
