@@ -106,6 +106,39 @@ interface BannerFormValues {
   isActive: boolean;
 }
 
+type BannerLayout = "carousel" | "grid" | "spotlight";
+
+interface BannerSettings {
+  layout: BannerLayout;
+  options: {
+    carousel: {
+      autoAdvance: boolean;
+      intervalMs: number;
+      showArrows: boolean;
+      showDots: boolean;
+      height: "compact" | "standard" | "tall";
+    };
+    grid: {
+      columns: number;
+      aspectRatio: "landscape" | "square";
+      showSubtitle: boolean;
+    };
+    spotlight: {
+      maxListItems: number;
+      showListSubtitle: boolean;
+    };
+  };
+}
+
+const DEFAULT_BANNER_SETTINGS: BannerSettings = {
+  layout: "carousel",
+  options: {
+    carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
+    grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
+    spotlight: { maxListItems: 4, showListSubtitle: false },
+  },
+};
+
 /* ---------------------------------- Shared styles ---------------------------------- */
 
 const inputClass =
@@ -820,16 +853,267 @@ function UsersSection({ users }: { users: AdminUser[] }) {
   );
 }
 
+/* ---------------------------------- Banner layout panel ---------------------------------- */
+
+const LAYOUT_TEMPLATES: { id: BannerLayout; label: string; description: string }[] = [
+  { id: "carousel", label: "Carousel", description: "One full-width banner at a time, auto-advancing." },
+  { id: "grid", label: "Grid", description: "All active banners shown at once in a card grid." },
+  { id: "spotlight", label: "Spotlight", description: "One featured banner with a list of others beside it." },
+];
+
+function LayoutPreview({ layout }: { layout: BannerLayout }) {
+  if (layout === "grid") {
+    return (
+      <div className="grid grid-cols-2 gap-1 h-12 w-full">
+        <div className="rounded-md bg-white/20" />
+        <div className="rounded-md bg-white/20" />
+        <div className="rounded-md bg-white/20" />
+        <div className="rounded-md bg-white/20" />
+      </div>
+    );
+  }
+  if (layout === "spotlight") {
+    return (
+      <div className="flex gap-1 h-12 w-full">
+        <div className="flex-1 rounded-md bg-white/20" />
+        <div className="w-6 flex flex-col gap-1">
+          <div className="flex-1 rounded-md bg-white/20" />
+          <div className="flex-1 rounded-md bg-white/20" />
+          <div className="flex-1 rounded-md bg-white/20" />
+        </div>
+      </div>
+    );
+  }
+  return <div className="h-12 w-full rounded-md bg-white/20" />;
+}
+
+function SegmentedControl<T extends string | number>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex rounded-lg border border-white/10 overflow-hidden text-xs w-fit">
+      {options.map((opt) => (
+        <button
+          type="button"
+          key={String(opt.value)}
+          onClick={() => onChange(opt.value)}
+          className={`px-3 py-1.5 transition-colors ${
+            value === opt.value ? "bg-white text-black" : "bg-transparent text-gray-400 hover:text-white"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BannerLayoutPanel({
+  initial,
+  saving,
+  onSave,
+}: {
+  initial: BannerSettings;
+  saving: boolean;
+  onSave: (values: BannerSettings) => void;
+}) {
+  const [settings, setSettings] = useState<BannerSettings>(initial);
+
+  useEffect(() => {
+    setSettings(initial);
+  }, [initial]);
+
+  const updateCarousel = (patch: Partial<BannerSettings["options"]["carousel"]>) =>
+    setSettings((prev) => ({ ...prev, options: { ...prev.options, carousel: { ...prev.options.carousel, ...patch } } }));
+  const updateGrid = (patch: Partial<BannerSettings["options"]["grid"]>) =>
+    setSettings((prev) => ({ ...prev, options: { ...prev.options, grid: { ...prev.options.grid, ...patch } } }));
+  const updateSpotlight = (patch: Partial<BannerSettings["options"]["spotlight"]>) =>
+    setSettings((prev) => ({ ...prev, options: { ...prev.options, spotlight: { ...prev.options.spotlight, ...patch } } }));
+
+  return (
+    <div className={cardClass}>
+      <h3 className="text-sm font-semibold text-white mb-1">Banner layout</h3>
+      <p className="text-xs text-gray-500 mb-4">Choose how the banner section looks on the shop page.</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        {LAYOUT_TEMPLATES.map((tpl) => (
+          <button
+            type="button"
+            key={tpl.id}
+            onClick={() => setSettings((prev) => ({ ...prev, layout: tpl.id }))}
+            className={`text-left rounded-xl border p-4 transition-colors ${
+              settings.layout === tpl.id ? "border-white bg-white/5" : "border-white/10 hover:border-white/20"
+            }`}
+          >
+            <LayoutPreview layout={tpl.id} />
+            <div className="text-sm font-medium text-white mt-3">{tpl.label}</div>
+            <div className="text-xs text-gray-500 mt-1">{tpl.description}</div>
+          </button>
+        ))}
+      </div>
+
+      {settings.layout === "carousel" && (
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={settings.options.carousel.autoAdvance}
+              onChange={(e) => updateCarousel({ autoAdvance: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Auto-advance</span>
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+              <input
+                type="number"
+                min={2}
+                max={10}
+                value={Math.round(settings.options.carousel.intervalMs / 1000)}
+                onChange={(e) => {
+                  const seconds = Number.parseInt(e.target.value, 10);
+                  const clamped = Number.isFinite(seconds) ? Math.min(10, Math.max(2, seconds)) : 5;
+                  updateCarousel({ intervalMs: clamped * 1000 });
+                }}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Height</label>
+              <SegmentedControl
+                value={settings.options.carousel.height}
+                onChange={(v) => updateCarousel({ height: v })}
+                options={[
+                  { value: "compact", label: "Compact" },
+                  { value: "standard", label: "Standard" },
+                  { value: "tall", label: "Tall" },
+                ]}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={settings.options.carousel.showArrows}
+                onChange={(e) => updateCarousel({ showArrows: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Show arrows</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={settings.options.carousel.showDots}
+                onChange={(e) => updateCarousel({ showDots: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Show dots</span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {settings.layout === "grid" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Columns</label>
+              <SegmentedControl
+                value={settings.options.grid.columns}
+                onChange={(v) => updateGrid({ columns: v })}
+                options={[
+                  { value: 2, label: "2" },
+                  { value: 3, label: "3" },
+                  { value: 4, label: "4" },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Aspect ratio</label>
+              <SegmentedControl
+                value={settings.options.grid.aspectRatio}
+                onChange={(v) => updateGrid({ aspectRatio: v })}
+                options={[
+                  { value: "landscape", label: "Landscape" },
+                  { value: "square", label: "Square" },
+                ]}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={settings.options.grid.showSubtitle}
+              onChange={(e) => updateGrid({ showSubtitle: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Show subtitle</span>
+          </label>
+        </div>
+      )}
+
+      {settings.layout === "spotlight" && (
+        <div className="space-y-4">
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Max list items</label>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={settings.options.spotlight.maxListItems}
+              onChange={(e) => {
+                const value = Number.parseInt(e.target.value, 10);
+                const clamped = Number.isFinite(value) ? Math.min(8, Math.max(1, value)) : 4;
+                updateSpotlight({ maxListItems: clamped });
+              }}
+              className={inputClass}
+            />
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={settings.options.spotlight.showListSubtitle}
+              onChange={(e) => updateSpotlight({ showListSubtitle: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Show subtitle in list</span>
+          </label>
+        </div>
+      )}
+
+      <div className="flex justify-end pt-6 mt-2 border-t border-white/5">
+        <button type="button" disabled={saving} onClick={() => onSave(settings)} className={primaryButtonClass}>
+          {saving ? "Saving…" : "Save layout"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------------------------- Banners tab ---------------------------------- */
 
 function BannersSection({
   banners,
+  bannerSettings,
+  savingSettings,
+  onSaveSettings,
   onCreate,
   onUpdate,
   onDelete,
   onToggleActive,
 }: {
   banners: Banner[];
+  bannerSettings: BannerSettings;
+  savingSettings: boolean;
+  onSaveSettings: (values: BannerSettings) => Promise<void>;
   onCreate: (values: BannerFormValues) => Promise<void>;
   onUpdate: (id: string, values: BannerFormValues) => Promise<void>;
   onDelete: (banner: Banner) => Promise<void>;
@@ -870,6 +1154,8 @@ function BannersSection({
 
   return (
     <div className="space-y-6">
+      <BannerLayoutPanel initial={bannerSettings} saving={savingSettings} onSave={onSaveSettings} />
+
       <div className="flex items-center justify-between">
         <h2 className="text-sm text-gray-500">
           {banners.length} banner{banners.length !== 1 ? "s" : ""}
@@ -953,6 +1239,8 @@ export function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
+  const [savingBannerSettings, setSavingBannerSettings] = useState(false);
 
   const fetchMetrics = useCallback(async () => {
     const data = await apiFetch<Metrics>("/admin/metrics");
@@ -974,13 +1262,24 @@ export function AdminDashboard() {
     const data = await apiFetch<Banner[]>("/admin/banners");
     setBanners(data);
   }, []);
+  const fetchBannerSettings = useCallback(async () => {
+    const data = await apiFetch<BannerSettings>("/admin/banner-settings");
+    setBannerSettings(data);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        await Promise.all([fetchMetrics(), fetchUsers(), fetchProducts(), fetchOrders(), fetchBanners()]);
+        await Promise.all([
+          fetchMetrics(),
+          fetchUsers(),
+          fetchProducts(),
+          fetchOrders(),
+          fetchBanners(),
+          fetchBannerSettings(),
+        ]);
       } catch (err) {
         if (!cancelled) toast.error(errorMessage(err, "Failed to load admin dashboard"));
       } finally {
@@ -1084,6 +1383,19 @@ export function AdminDashboard() {
     }
   };
 
+  const handleSaveBannerSettings = async (values: BannerSettings) => {
+    setSavingBannerSettings(true);
+    try {
+      await apiFetch("/admin/banner-settings", { method: "PUT", body: values });
+      toast.success("Banner layout saved");
+      await fetchBannerSettings();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to save banner layout"));
+    } finally {
+      setSavingBannerSettings(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-8">Admin console</h1>
@@ -1147,6 +1459,9 @@ export function AdminDashboard() {
           {activeTab === "banners" && (
             <BannersSection
               banners={banners}
+              bannerSettings={bannerSettings}
+              savingSettings={savingBannerSettings}
+              onSaveSettings={handleSaveBannerSettings}
               onCreate={handleCreateBanner}
               onUpdate={handleUpdateBanner}
               onDelete={handleDeleteBanner}

@@ -41,6 +41,39 @@ interface Banner {
   isActive: boolean;
 }
 
+type BannerLayout = "carousel" | "grid" | "spotlight";
+
+interface BannerSettings {
+  layout: BannerLayout;
+  options: {
+    carousel: {
+      autoAdvance: boolean;
+      intervalMs: number;
+      showArrows: boolean;
+      showDots: boolean;
+      height: "compact" | "standard" | "tall";
+    };
+    grid: {
+      columns: number;
+      aspectRatio: "landscape" | "square";
+      showSubtitle: boolean;
+    };
+    spotlight: {
+      maxListItems: number;
+      showListSubtitle: boolean;
+    };
+  };
+}
+
+const DEFAULT_BANNER_SETTINGS: BannerSettings = {
+  layout: "carousel",
+  options: {
+    carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
+    grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
+    spotlight: { maxListItems: 4, showListSubtitle: false },
+  },
+};
+
 type SortOption = "price_asc" | "price_desc" | "name_asc" | "newest";
 type Availability = "in_stock" | "out_of_stock";
 
@@ -100,6 +133,7 @@ function ShopContent() {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannerSettings, setBannerSettings] = useState<BannerSettings>(DEFAULT_BANNER_SETTINGS);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -117,18 +151,22 @@ function ShopContent() {
   const [priceMax, setPriceMax] = useState("");
   const [availability, setAvailability] = useState<Availability[]>([]);
 
-  // Fetch categories + banners once.
+  // Fetch categories + banners + banner layout settings once.
   useEffect(() => {
     (async () => {
       try {
-        const [cats, bnrs] = await Promise.all([
+        const [cats, bnrs, settings] = await Promise.all([
           apiFetch<string[]>("/products/categories", { auth: false }),
           apiFetch<Banner[]>("/products/banners", { auth: false }),
+          apiFetch<BannerSettings>("/products/banner-settings", { auth: false }).catch(
+            () => DEFAULT_BANNER_SETTINGS
+          ),
         ]);
         setCategories(cats);
         setBanners(bnrs);
+        setBannerSettings(settings);
       } catch {
-        // Non-fatal: filters/carousel simply stay empty.
+        // Non-fatal: filters/banner section simply stay empty.
       }
     })();
   }, []);
@@ -161,14 +199,16 @@ function ShopContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, selectedCategories.join(","), sort, priceMin, priceMax, availability.join(",")]);
 
-  // Banner auto-advance.
+  // Banner auto-advance (carousel layout only).
   useEffect(() => {
+    if (bannerSettings.layout !== "carousel") return;
+    if (!bannerSettings.options.carousel.autoAdvance) return;
     if (banners.length <= 1) return;
     const id = setInterval(() => {
       setBannerIndex((i) => (i + 1) % banners.length);
-    }, 5000);
+    }, bannerSettings.options.carousel.intervalMs);
     return () => clearInterval(id);
-  }, [banners.length]);
+  }, [banners.length, bannerSettings.layout, bannerSettings.options.carousel.autoAdvance, bannerSettings.options.carousel.intervalMs]);
 
   const filteredProducts = useMemo(() => {
     const min = priceMin.trim() === "" ? null : Number(priceMin);
@@ -216,11 +256,20 @@ function ShopContent() {
   return (
     <>
       {banners.length > 0 && (
-        <BannerCarousel
-          banners={banners}
-          index={bannerIndex}
-          onIndexChange={setBannerIndex}
-        />
+        <>
+          {bannerSettings.layout === "grid" ? (
+            <BannerGrid banners={banners} options={bannerSettings.options.grid} />
+          ) : bannerSettings.layout === "spotlight" ? (
+            <BannerSpotlight banners={banners} options={bannerSettings.options.spotlight} />
+          ) : (
+            <BannerCarousel
+              banners={banners}
+              index={bannerIndex}
+              onIndexChange={setBannerIndex}
+              options={bannerSettings.options.carousel}
+            />
+          )}
+        </>
       )}
 
       <div className="max-w-7xl mx-auto px-6 py-10">
@@ -415,49 +464,65 @@ function ShopContent() {
 
 /* ---------------------------- Banner carousel ---------------------------- */
 
+const CAROUSEL_HEIGHT_CLASSES: Record<BannerSettings["options"]["carousel"]["height"], string> = {
+  compact: "h-[200px] md:h-[280px]",
+  standard: "h-[280px] md:h-[380px]",
+  tall: "h-[360px] md:h-[480px]",
+};
+
 function BannerCarousel({
   banners,
   index,
   onIndexChange,
+  options,
 }: {
   banners: Banner[];
   index: number;
   onIndexChange: (i: number) => void;
+  options: BannerSettings["options"]["carousel"];
 }) {
   return (
-    <div className="relative w-full h-[280px] md:h-[380px] overflow-hidden bg-[#111113]">
+    <div
+      className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[options.height]}`}
+    >
       {banners.map((b, i) => (
         <BannerSlide key={b._id} banner={b} active={i === index} />
       ))}
 
       {banners.length > 1 && (
         <>
-          <button
-            onClick={() => onIndexChange((index - 1 + banners.length) % banners.length)}
-            aria-label="Previous banner"
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => onIndexChange((index + 1) % banners.length)}
-            aria-label="Next banner"
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5">
-            {banners.map((_, i) => (
+          {options.showArrows && (
+            <>
               <button
-                key={i}
-                onClick={() => onIndexChange(i)}
-                aria-label={`Go to banner ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === index ? "w-6 bg-white" : "w-1.5 bg-white/40"
-                }`}
-              />
-            ))}
-          </div>
+                onClick={() => onIndexChange((index - 1 + banners.length) % banners.length)}
+                aria-label="Previous banner"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onIndexChange((index + 1) % banners.length)}
+                aria-label="Next banner"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {options.showDots && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5">
+              {banners.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => onIndexChange(i)}
+                  aria-label={`Go to banner ${i + 1}`}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === index ? "w-6 bg-white" : "w-1.5 bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -490,6 +555,129 @@ function BannerSlide({ banner, active }: { banner: Banner; active: boolean }) {
     );
   }
   return <div className={className}>{content}</div>;
+}
+
+/* ------------------------------ Banner grid ------------------------------ */
+
+const GRID_COLUMN_CLASSES: Record<number, string> = {
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-2 lg:grid-cols-3",
+  4: "sm:grid-cols-2 lg:grid-cols-4",
+};
+
+function BannerGrid({
+  banners,
+  options,
+}: {
+  banners: Banner[];
+  options: BannerSettings["options"]["grid"];
+}) {
+  const sorted = [...banners].sort((a, b) => a.order - b.order);
+  const columnClass = GRID_COLUMN_CLASSES[options.columns] ?? GRID_COLUMN_CLASSES[3];
+  const aspectClass = options.aspectRatio === "square" ? "aspect-square" : "aspect-video";
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className={`grid grid-cols-1 ${columnClass} gap-4`}>
+        {sorted.map((banner) => {
+          const card = (
+            <div className="group relative w-full h-full overflow-hidden rounded-2xl bg-[#111113] border border-white/10">
+              <div className={`relative w-full ${aspectClass} overflow-hidden`}>
+                <img
+                  src={banner.imageUrl}
+                  alt={banner.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              <div className="p-4">
+                <h3 className="text-sm font-semibold text-white truncate">{banner.title}</h3>
+                {options.showSubtitle && banner.subtitle && (
+                  <p className="text-xs text-gray-400 mt-1 line-clamp-2">{banner.subtitle}</p>
+                )}
+              </div>
+            </div>
+          );
+          return banner.linkUrl ? (
+            <a key={banner._id} href={banner.linkUrl} className="block h-full">
+              {card}
+            </a>
+          ) : (
+            <div key={banner._id}>{card}</div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------- Banner spotlight ---------------------------- */
+
+function BannerSpotlight({
+  banners,
+  options,
+}: {
+  banners: Banner[];
+  options: BannerSettings["options"]["spotlight"];
+}) {
+  const sorted = [...banners].sort((a, b) => a.order - b.order);
+  const featured = sorted[0];
+  const rest = sorted.slice(1, 1 + options.maxListItems);
+
+  const featuredCard = (
+    <div className="relative w-full h-[280px] md:h-[420px] overflow-hidden rounded-2xl bg-[#111113]">
+      <img src={featured.imageUrl} alt={featured.title} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-6">
+        <h2 className="text-xl md:text-3xl font-semibold text-white tracking-tight">{featured.title}</h2>
+        {featured.subtitle && (
+          <p className="text-sm text-gray-300 mt-2 max-w-xl">{featured.subtitle}</p>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="lg:w-2/3">
+          {featured.linkUrl ? (
+            <a href={featured.linkUrl} className="block">
+              {featuredCard}
+            </a>
+          ) : (
+            featuredCard
+          )}
+        </div>
+
+        {rest.length > 0 && (
+          <div className="lg:w-1/3 flex flex-row lg:flex-col gap-3 overflow-x-auto lg:overflow-visible">
+            {rest.map((banner) => {
+              const row = (
+                <div className="flex items-center gap-3 bg-[#111113] border border-white/10 rounded-xl p-3 w-64 lg:w-full shrink-0">
+                  <div className="h-14 w-14 shrink-0 rounded-lg overflow-hidden bg-white/5">
+                    <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{banner.title}</div>
+                    {options.showListSubtitle && banner.subtitle && (
+                      <div className="text-xs text-gray-500 truncate">{banner.subtitle}</div>
+                    )}
+                  </div>
+                </div>
+              );
+              return banner.linkUrl ? (
+                <a key={banner._id} href={banner.linkUrl} className="block">
+                  {row}
+                </a>
+              ) : (
+                <div key={banner._id}>{row}</div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ------------------------------ Product card ------------------------------ */
