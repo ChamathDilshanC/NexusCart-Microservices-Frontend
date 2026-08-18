@@ -634,6 +634,23 @@ function BannerBlock({ template, banners }: { template: BannerTemplate; banners:
 /* ---------------------------- Banner showcase ---------------------------- */
 
 const SHOWCASE_HEIGHT = "h-[220px] md:h-[320px]";
+// Six positions relative to the current step: -1/4 are collapsed buffers just
+// off both edges (so cards fade+grow in and fade+shrink out instead of
+// popping), 0/3 are the small edge cards, 1/2 are the large centered ones.
+const SHOWCASE_OFFSETS = [-1, 0, 1, 2, 3, 4] as const;
+
+function showcaseCardStyle(offset: number): React.CSSProperties {
+  const base: React.CSSProperties = {
+    flexBasis: 0,
+    minWidth: 0,
+    transition: "flex-grow 600ms cubic-bezier(.4,0,.2,1), opacity 500ms ease",
+  };
+  if (offset === -1 || offset === 4) return { ...base, flexGrow: 0, opacity: 0 };
+  if (offset === 1 || offset === 2) return { ...base, flexGrow: 2.6, opacity: 1 };
+  return { ...base, flexGrow: 1, opacity: 1 };
+}
+
+const mod = (n: number, m: number) => ((n % m) + m) % m;
 
 function BannerShowcase({
   banners,
@@ -644,38 +661,50 @@ function BannerShowcase({
 }) {
   const sorted = useMemo(() => [...banners].sort((a, b) => a.order - b.order), [banners]);
   const [step, setStep] = useState(0);
-  const visibleCount = Math.min(4, sorted.length);
 
   useEffect(() => {
-    setStep((s) => (sorted.length === 0 ? 0 : s % sorted.length));
-  }, [sorted.length]);
-
-  useEffect(() => {
-    if (!options.autoAdvance || sorted.length <= visibleCount) return;
-    const id = setInterval(() => {
-      setStep((s) => (s + 1) % sorted.length);
-    }, options.intervalMs);
+    if (!options.autoAdvance || sorted.length <= 1) return;
+    // Stepping forward walks each banner's offset from -1 up to 4, so on
+    // screen it enters at the left edge and flows across to exit on the right.
+    const id = setInterval(() => setStep((s) => s + 1), options.intervalMs);
     return () => clearInterval(id);
-  }, [sorted.length, visibleCount, options.autoAdvance, options.intervalMs]);
+  }, [sorted.length, options.autoAdvance, options.intervalMs]);
 
   if (sorted.length === 0) return null;
 
-  const slots = Array.from({ length: visibleCount }, (_, i) => sorted[(step + i) % sorted.length]);
-  // With 4+ banners the two centered slots read as "large"; anything shown
-  // with fewer than 4 just fills the row evenly.
-  const isLargeSlot = (i: number) => visibleCount < 4 || i === 1 || i === 2;
+  // With fewer banners than slots, the same banner can land on two offsets —
+  // claim the visible slots first (large centers, then small edges) so a
+  // scarce banner always fills what's on screen before an invisible buffer.
+  const used = new Set<number>();
+  const offsetToBanner = new Map<number, Banner>();
+  for (const offset of [1, 2, 0, 3, -1, 4]) {
+    const idx = mod(step - offset, sorted.length);
+    if (used.has(idx)) continue;
+    used.add(idx);
+    offsetToBanner.set(offset, sorted[idx]);
+  }
+  const slots = SHOWCASE_OFFSETS.map((offset) => ({ offset, banner: offsetToBanner.get(offset) ?? null }));
 
-  const advance = (delta: number) => setStep((s) => (s + delta + sorted.length) % sorted.length);
+  const advance = (delta: number) => setStep((s) => s + delta);
 
   return (
     <div className="relative max-w-7xl mx-auto px-6 py-8">
-      <div className={`flex items-stretch gap-3 md:gap-4 ${SHOWCASE_HEIGHT}`}>
-        {slots.map((banner, i) => (
-          <ShowcaseCard key={`${banner._id}-${i}`} banner={banner} large={isLargeSlot(i)} />
-        ))}
+      <div className={`flex items-stretch gap-3 md:gap-4 overflow-hidden ${SHOWCASE_HEIGHT}`}>
+        {slots.map(({ offset, banner }) =>
+          banner ? (
+            <ShowcaseCard
+              key={banner._id}
+              banner={banner}
+              large={offset === 1 || offset === 2}
+              style={showcaseCardStyle(offset)}
+            />
+          ) : (
+            <div key={`empty-${offset}`} style={{ flexGrow: 0, flexBasis: 0 }} />
+          )
+        )}
       </div>
 
-      {options.showArrows && sorted.length > visibleCount && (
+      {options.showArrows && sorted.length > 1 && (
         <>
           <button
             onClick={() => advance(-1)}
@@ -697,14 +726,18 @@ function BannerShowcase({
   );
 }
 
-function ShowcaseCard({ banner, large }: { banner: Banner; large: boolean }) {
+function ShowcaseCard({
+  banner,
+  large,
+  style,
+}: {
+  banner: Banner;
+  large: boolean;
+  style: React.CSSProperties;
+}) {
   const href = bannerHref(banner);
   const content = (
-    <div
-      className={`group relative h-full overflow-hidden rounded-2xl bg-[#111113] border border-white/10 ${
-        large ? "flex-[2]" : "flex-1"
-      }`}
-    >
+    <div className="group relative h-full w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/10">
       <img
         src={banner.imageUrl}
         alt={banner.title}
@@ -729,11 +762,13 @@ function ShowcaseCard({ banner, large }: { banner: Banner; large: boolean }) {
   );
 
   return href ? (
-    <a href={href} className={`block h-full ${large ? "flex-[2]" : "flex-1"}`}>
+    <a href={href} className="block h-full overflow-hidden" style={style}>
       {content}
     </a>
   ) : (
-    content
+    <div className="h-full overflow-hidden" style={style}>
+      {content}
+    </div>
   );
 }
 

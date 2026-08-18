@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Onest } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import { Footer } from "@/components/Footer";
 
 const onest = Onest({
   variable: "--font-sans",
@@ -44,7 +45,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${onest.variable} scroll-smooth`} data-scroll-behavior="smooth">
       <body className="bg-black text-white antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <Footer />
+        </Providers>
       </body>
     </html>
   );
