@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Package,
   ShoppingBag,
@@ -14,13 +15,16 @@ import {
   Eye,
   EyeOff,
   DollarSign,
+  Percent,
+  Search,
+  Receipt,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 
 /* ---------------------------------- Types ---------------------------------- */
 
-type TabId = "products" | "orders" | "users" | "banners";
+type TabId = "products" | "orders" | "users" | "banners" | "promotions";
 type IconType = React.ComponentType<{ className?: string }>;
 
 interface Metrics {
@@ -47,6 +51,9 @@ interface Product {
   imageUrl?: string;
   images?: string[];
   isFeatured?: boolean;
+  effectivePrice?: number;
+  discountPercent?: number;
+  promotionName?: string | null;
 }
 
 interface OrderItem {
@@ -69,6 +76,8 @@ interface ShippingAddress {
 
 interface Order {
   _id: string;
+  customerEmail?: string;
+  customerName?: string;
   items: OrderItem[];
   totalAmount: number;
   shippingAddress?: ShippingAddress;
@@ -155,6 +164,30 @@ const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
   spotlight: { maxListItems: 4, showListSubtitle: false },
 };
 
+type DiscountType = "percentage" | "fixed";
+type PromotionScope = "all" | "category" | "products";
+
+interface Promotion {
+  _id: string;
+  name: string;
+  discountType: DiscountType;
+  discountValue: number;
+  scope: PromotionScope;
+  category?: string;
+  productIds: string[];
+  isActive: boolean;
+}
+
+interface PromotionFormValues {
+  name: string;
+  discountType: DiscountType;
+  discountValue: number;
+  scope: PromotionScope;
+  category: string;
+  productIds: string[];
+  isActive: boolean;
+}
+
 /* ---------------------------------- Shared styles ---------------------------------- */
 
 const inputClass =
@@ -172,6 +205,7 @@ const TABS: { id: TabId; label: string; icon: IconType }[] = [
   { id: "orders", label: "Orders", icon: ShoppingBag },
   { id: "users", label: "Users", icon: Users },
   { id: "banners", label: "Banners", icon: ImagePlus },
+  { id: "promotions", label: "Promotions", icon: Percent },
 ];
 
 /* ---------------------------------- Helpers ---------------------------------- */
@@ -701,6 +735,7 @@ function ProductsSection({
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState("");
 
   const openCreate = () => {
     setEditing(null);
@@ -729,23 +764,45 @@ function ProductsSection({
     }
   };
 
+  const filteredProducts = products.filter((p) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <h2 className="text-sm text-gray-500">
-          {products.length} product{products.length !== 1 ? "s" : ""}
+          {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""}
+          {search.trim() && ` of ${products.length}`}
         </h2>
-        <button onClick={openCreate} className={`${primaryButtonClass} flex items-center gap-2`}>
-          <Plus className="w-4 h-4" /> Add product
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products..."
+              className={`${inputClass} pl-10 w-56`}
+            />
+          </div>
+          <button onClick={openCreate} className={`${primaryButtonClass} flex items-center gap-2 shrink-0`}>
+            <Plus className="w-4 h-4" /> Add product
+          </button>
+        </div>
       </div>
 
       {products.length === 0 ? (
         <EmptyState message="No products yet. Add your first product to get started." />
+      ) : filteredProducts.length === 0 ? (
+        <EmptyState message="No products match your search." />
       ) : (
         <div className="space-y-3">
-          {products.map((product) => {
+          {filteredProducts.map((product) => {
             const imageCount = (product.imageUrl ? 1 : 0) + (product.images?.length ?? 0);
+            const onSale = !!product.discountPercent && product.discountPercent > 0;
             return (
               <div key={product._id} className="flex items-center gap-4 bg-[#111113] border border-white/10 rounded-2xl p-4">
                 <Thumbnail src={product.imageUrl} alt={product.name} />
@@ -757,12 +814,26 @@ function ProductsSection({
                         Featured
                       </span>
                     )}
+                    {onSale && (
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                        -{product.discountPercent}%
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1 truncate">
                     {product.category} · {product.stock} in stock · {imageCount} image{imageCount !== 1 ? "s" : ""}
                   </p>
                 </div>
-                <div className="text-sm font-medium text-white shrink-0">{formatCurrency(product.price)}</div>
+                <div className="text-sm font-medium text-white shrink-0">
+                  {onSale ? (
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 line-through">{formatCurrency(product.price)}</span>
+                      <span className="text-emerald-300">{formatCurrency(product.effectivePrice ?? product.price)}</span>
+                    </span>
+                  ) : (
+                    formatCurrency(product.price)
+                  )}
+                </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <button
                     onClick={() => openEdit(product)}
@@ -841,7 +912,16 @@ function OrdersSection({
               <div key={order._id} className={cardClass}>
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                   <div>
-                    <div className="text-sm font-medium text-white">#{order._id.slice(-8)}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">#{order._id.slice(-8)}</span>
+                      <Link
+                        href={`/orders/${order._id}/invoice`}
+                        target="_blank"
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors"
+                      >
+                        <Receipt className="w-3.5 h-3.5" /> Invoice
+                      </Link>
+                    </div>
                     <div className="text-xs text-gray-500 mt-1">{formatDate(order.createdAt)}</div>
                   </div>
                   <div className="text-right">
@@ -1516,6 +1596,303 @@ function BannersSection({
   );
 }
 
+/* ---------------------------------- Promotions tab ---------------------------------- */
+
+function describeScope(promo: { scope: PromotionScope; category?: string; productIds: string[] }) {
+  if (promo.scope === "all") return "All products";
+  if (promo.scope === "category") return `Category: ${promo.category || "—"}`;
+  return `${promo.productIds.length} product${promo.productIds.length !== 1 ? "s" : ""}`;
+}
+
+function describeDiscount(promo: { discountType: DiscountType; discountValue: number }) {
+  return promo.discountType === "percentage" ? `${promo.discountValue}% off` : `${formatCurrency(promo.discountValue)} off`;
+}
+
+function PromotionForm({
+  initial,
+  categories,
+  products,
+  submitting,
+  onCancel,
+  onSubmit,
+}: {
+  initial: Promotion | null;
+  categories: string[];
+  products: Product[];
+  submitting: boolean;
+  onCancel: () => void;
+  onSubmit: (values: PromotionFormValues) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [discountType, setDiscountType] = useState<DiscountType>(initial?.discountType ?? "percentage");
+  const [discountValue, setDiscountValue] = useState(initial ? String(initial.discountValue) : "10");
+  const [scope, setScope] = useState<PromotionScope>(initial?.scope ?? "all");
+  const [category, setCategory] = useState(initial?.category ?? categories[0] ?? "");
+  const [productIds, setProductIds] = useState<string[]>(initial?.productIds ?? []);
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  const toast = useToast();
+
+  const toggleProduct = (id: string) => {
+    setProductIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Promotion name is required");
+      return;
+    }
+    if (scope === "category" && !category) {
+      toast.error("Pick a category");
+      return;
+    }
+    if (scope === "products" && productIds.length === 0) {
+      toast.error("Pick at least one product");
+      return;
+    }
+    onSubmit({
+      name: name.trim(),
+      discountType,
+      discountValue: Number.parseFloat(discountValue) || 0,
+      scope,
+      category: scope === "category" ? category : "",
+      productIds: scope === "products" ? productIds : [],
+      isActive,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Promotion name</label>
+        <input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Summer Sale"
+          className={inputClass}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Discount type</label>
+          <SegmentedControl
+            value={discountType}
+            onChange={setDiscountType}
+            options={[
+              { value: "percentage", label: "Percentage" },
+              { value: "fixed", label: "Fixed amount" },
+            ]}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">
+            Value {discountType === "percentage" ? "(%)" : "($)"}
+          </label>
+          <input
+            type="number"
+            min={0}
+            step={discountType === "percentage" ? 1 : 0.01}
+            value={discountValue}
+            onChange={(e) => setDiscountValue(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Applies to</label>
+        <SegmentedControl
+          value={scope}
+          onChange={setScope}
+          options={[
+            { value: "all", label: "All products" },
+            { value: "category", label: "Category" },
+            { value: "products", label: "Specific products" },
+          ]}
+        />
+      </div>
+
+      {scope === "category" && (
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Category</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass}>
+            {categories.length === 0 && <option value="">No categories yet</option>}
+            {categories.map((cat) => (
+              <option key={cat} value={cat} className="bg-[#111113]">
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {scope === "products" && (
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Products</label>
+          {products.length === 0 ? (
+            <p className="text-xs text-gray-600">No products yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1 bg-white/5 border border-white/10 rounded-xl p-3">
+              {products.map((p) => (
+                <label key={p._id} className="flex items-center gap-2.5 text-sm text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={productIds.includes(p._id)}
+                    onChange={() => toggleProduct(p._id)}
+                    className="accent-white w-4 h-4"
+                  />
+                  {p.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={isActive}
+          onChange={(e) => setIsActive(e.target.checked)}
+          className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+        />
+        <span className="text-sm text-gray-300">Active</span>
+      </label>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel} className={secondaryButtonClass}>
+          Cancel
+        </button>
+        <button type="submit" disabled={submitting} className={primaryButtonClass}>
+          {submitting ? "Saving…" : initial ? "Save changes" : "Create promotion"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function PromotionsSection({
+  promotions,
+  categories,
+  products,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: {
+  promotions: Promotion[];
+  categories: string[];
+  products: Product[];
+  onCreate: (values: PromotionFormValues) => Promise<void>;
+  onUpdate: (id: string, values: PromotionFormValues) => Promise<void>;
+  onDelete: (promotion: Promotion) => Promise<void>;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Promotion | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const openCreate = () => {
+    setEditing(null);
+    setShowForm(true);
+  };
+  const openEdit = (promotion: Promotion) => {
+    setEditing(promotion);
+    setShowForm(true);
+  };
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+  };
+
+  const handleSubmit = async (values: PromotionFormValues) => {
+    setSubmitting(true);
+    try {
+      if (editing) {
+        await onUpdate(editing._id, values);
+      } else {
+        await onCreate(values);
+      }
+      closeForm();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm text-gray-500">
+          {promotions.length} promotion{promotions.length !== 1 ? "s" : ""}
+        </h2>
+        <button onClick={openCreate} className={`${primaryButtonClass} flex items-center gap-2`}>
+          <Plus className="w-4 h-4" /> Add promotion
+        </button>
+      </div>
+
+      {promotions.length === 0 ? (
+        <EmptyState message="No promotions yet. Add one to start discounting products." />
+      ) : (
+        <div className="space-y-3">
+          {promotions.map((promo) => (
+            <div key={promo._id} className="flex items-center gap-4 bg-[#111113] border border-white/10 rounded-2xl p-4">
+              <div className="h-10 w-10 shrink-0 rounded-full bg-emerald-500/10 border border-emerald-500/20 grid place-items-center">
+                <Percent className="w-4 h-4 text-emerald-300" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-white truncate">{promo.name}</h4>
+                  <span
+                    className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      promo.isActive
+                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                        : "bg-white/5 text-gray-500 border-white/10"
+                    }`}
+                  >
+                    {promo.isActive ? "Live" : "Hidden"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {describeDiscount(promo)} · {describeScope(promo)}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => openEdit(promo)}
+                  aria-label="Edit promotion"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onDelete(promo)}
+                  aria-label="Delete promotion"
+                  className="text-red-400 hover:text-red-300 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <Modal title={editing ? "Edit promotion" : "Add promotion"} onClose={closeForm}>
+          <PromotionForm
+            initial={editing}
+            categories={categories}
+            products={products}
+            submitting={submitting}
+            onCancel={closeForm}
+            onSubmit={handleSubmit}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 /* ---------------------------------- Main dashboard ---------------------------------- */
 
 export function AdminDashboard() {
@@ -1530,6 +1907,7 @@ export function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
 
   const fetchMetrics = useCallback(async () => {
     const data = await apiFetch<Metrics>("/admin/metrics");
@@ -1559,6 +1937,10 @@ export function AdminDashboard() {
     const data = await apiFetch<BannerTemplate[]>("/admin/banner-templates");
     setBannerTemplates(data);
   }, []);
+  const fetchPromotions = useCallback(async () => {
+    const data = await apiFetch<Promotion[]>("/admin/promotions");
+    setPromotions(data);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1573,6 +1955,7 @@ export function AdminDashboard() {
           fetchOrders(),
           fetchBanners(),
           fetchBannerTemplates(),
+          fetchPromotions(),
         ]);
       } catch (err) {
         if (!cancelled) toast.error(errorMessage(err, "Failed to load admin dashboard"));
@@ -1709,6 +2092,39 @@ export function AdminDashboard() {
     }
   };
 
+  /* ---- Promotions ---- */
+
+  const handleCreatePromotion = async (values: PromotionFormValues) => {
+    try {
+      await apiFetch("/admin/promotions", { method: "POST", body: values });
+      toast.success("Promotion created");
+      await Promise.all([fetchPromotions(), fetchProducts()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to create promotion"));
+    }
+  };
+
+  const handleUpdatePromotion = async (id: string, values: PromotionFormValues) => {
+    try {
+      await apiFetch(`/admin/promotions/${id}`, { method: "PUT", body: values });
+      toast.success("Promotion updated");
+      await Promise.all([fetchPromotions(), fetchProducts()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to update promotion"));
+    }
+  };
+
+  const handleDeletePromotion = async (promotion: Promotion) => {
+    if (!window.confirm(`Delete "${promotion.name}"?`)) return;
+    try {
+      await apiFetch(`/admin/promotions/${promotion._id}`, { method: "DELETE" });
+      toast.success("Promotion deleted");
+      await Promise.all([fetchPromotions(), fetchProducts()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to delete promotion"));
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-8">Admin console</h1>
@@ -1781,6 +2197,16 @@ export function AdminDashboard() {
               onUpdate={handleUpdateBanner}
               onDelete={handleDeleteBanner}
               onToggleActive={handleToggleBannerActive}
+            />
+          )}
+          {activeTab === "promotions" && (
+            <PromotionsSection
+              promotions={promotions}
+              categories={categories}
+              products={products}
+              onCreate={handleCreatePromotion}
+              onUpdate={handleUpdatePromotion}
+              onDelete={handleDeletePromotion}
             />
           )}
         </>

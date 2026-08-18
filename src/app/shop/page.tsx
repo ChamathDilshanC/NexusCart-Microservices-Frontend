@@ -29,6 +29,8 @@ interface Product {
   imageUrl?: string;
   images?: string[];
   isFeatured?: boolean;
+  effectivePrice?: number;
+  discountPercent?: number;
 }
 
 interface Banner {
@@ -237,6 +239,11 @@ function ShopContent() {
   const aboveGridSection = renderTemplateGroup("above-grid");
   const bottomSection = renderTemplateGroup("bottom");
 
+  const onSaleProducts = useMemo(
+    () => products.filter((p) => p.discountPercent && p.discountPercent > 0).slice(0, 8),
+    [products]
+  );
+
   const filteredProducts = useMemo(() => {
     const min = priceMin.trim() === "" ? null : Number(priceMin);
     const max = priceMax.trim() === "" ? null : Number(priceMax);
@@ -317,6 +324,22 @@ function ShopContent() {
             )}
           </button>
         </div>
+
+        {onSaleProducts.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-xl font-semibold tracking-tight text-white">On Sale</h2>
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                Limited time
+              </span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {onSaleProducts.map((p) => (
+                <ProductCard key={p._id} product={p} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {aboveGridSection && <div className="mb-8">{aboveGridSection}</div>}
 
@@ -746,11 +769,13 @@ function ProductCard({ product }: { product: Product }) {
   const toast = useToast();
   const inStock = product.stock > 0;
   const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem({ productId: product._id, name: product.name, price: product.price, imageUrl: imgSrc }, 1);
+    addItem({ productId: product._id, name: product.name, price: displayPrice, imageUrl: imgSrc }, 1);
     toast.success(`${product.name} added to cart`);
   };
 
@@ -777,12 +802,24 @@ function ProductCard({ product }: { product: Product }) {
             Featured
           </div>
         )}
+        {onSale && (
+          <div className="absolute top-3 right-3 bg-emerald-500 text-black text-[11px] font-semibold px-2.5 py-1 rounded-full">
+            -{product.discountPercent}%
+          </div>
+        )}
       </div>
       <div className="flex flex-col gap-1 p-4 flex-1">
         <span className="text-xs text-gray-500">{product.category}</span>
         <h3 className="text-sm font-medium text-white line-clamp-2">{product.name}</h3>
         <div className="mt-auto flex items-center justify-between pt-2">
-          <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
+          {onSale ? (
+            <span className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-emerald-400">{formatPrice(displayPrice)}</span>
+              <span className="text-xs text-gray-500 line-through">{formatPrice(product.price)}</span>
+            </span>
+          ) : (
+            <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
+          )}
           {inStock && (
             <button
               onClick={handleAddToCart}

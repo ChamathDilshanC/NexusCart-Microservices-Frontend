@@ -22,6 +22,8 @@ interface Product {
   imageUrl?: string;
   images?: string[];
   isFeatured?: boolean;
+  effectivePrice?: number;
+  discountPercent?: number;
 }
 
 interface Review {
@@ -131,7 +133,9 @@ export default function ProductDetailPage() {
   const handleAddToCart = () => {
     if (!product || product.stock <= 0) return;
     const gallery = product.images && product.images.length > 0 ? product.images : product.imageUrl ? [product.imageUrl] : [];
-    addItem({ productId: product._id, name: product.name, price: product.price, imageUrl: gallery[0] }, quantity);
+    const onSale = !!product.discountPercent && product.discountPercent > 0;
+    const price = onSale ? product.effectivePrice ?? product.price : product.price;
+    addItem({ productId: product._id, name: product.name, price, imageUrl: gallery[0] }, quantity);
     toast.success(`${product.name} added to cart`);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -296,7 +300,19 @@ export default function ProductDetailPage() {
               )}
             </div>
 
-            <p className="text-2xl font-semibold text-white mb-4">{formatPrice(product.price)}</p>
+            {product.discountPercent && product.discountPercent > 0 ? (
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-2xl font-semibold text-emerald-400">
+                  {formatPrice(product.effectivePrice ?? product.price)}
+                </p>
+                <p className="text-lg text-gray-500 line-through">{formatPrice(product.price)}</p>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  -{product.discountPercent}%
+                </span>
+              </div>
+            ) : (
+              <p className="text-2xl font-semibold text-white mb-4">{formatPrice(product.price)}</p>
+            )}
 
             <div className="mb-6">
               {product.stock > 0 ? (
@@ -503,11 +519,13 @@ function RelatedCard({ product }: { product: Product }) {
   const toast = useToast();
   const inStock = product.stock > 0;
   const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem({ productId: product._id, name: product.name, price: product.price, imageUrl: imgSrc }, 1);
+    addItem({ productId: product._id, name: product.name, price: displayPrice, imageUrl: imgSrc }, 1);
     toast.success(`${product.name} added to cart`);
   };
 
@@ -535,12 +553,24 @@ function RelatedCard({ product }: { product: Product }) {
             </span>
           </div>
         )}
+        {onSale && (
+          <div className="absolute top-3 right-3 bg-emerald-500 text-black text-[11px] font-semibold px-2.5 py-1 rounded-full">
+            -{product.discountPercent}%
+          </div>
+        )}
       </div>
       <div className="flex flex-col gap-1 p-4 flex-1">
         <span className="text-xs text-gray-500">{product.category}</span>
         <h3 className="text-sm font-medium text-white line-clamp-2">{product.name}</h3>
         <div className="mt-auto flex items-center justify-between pt-2">
-          <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
+          {onSale ? (
+            <span className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-emerald-400">{formatPrice(displayPrice)}</span>
+              <span className="text-xs text-gray-500 line-through">{formatPrice(product.price)}</span>
+            </span>
+          ) : (
+            <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
+          )}
           {inStock && (
             <button
               onClick={handleAddToCart}
