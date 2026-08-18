@@ -36,6 +36,8 @@ interface Review {
   createdAt: string;
 }
 
+const REVIEW_PREVIEW_COUNT = 3;
+
 /* -------------------------------- Page -------------------------------- */
 
 export default function ProductDetailPage() {
@@ -52,6 +54,7 @@ export default function ProductDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [related, setRelated] = useState<Product[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -402,24 +405,34 @@ export default function ProductDetailPage() {
               {reviews.length === 0 ? (
                 <p className="text-gray-500 text-sm">No reviews yet. Be the first to review this product.</p>
               ) : (
-                reviews.map((r) => (
-                  <div key={r._id} className="bg-[#111113] border border-white/10 rounded-2xl p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <StarRow rating={r.rating} size="w-3.5 h-3.5" />
-                      <span className="text-xs text-gray-500">
-                        {new Date(r.createdAt).toLocaleDateString(undefined, {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
+                <>
+                  {(showAllReviews ? reviews : reviews.slice(0, REVIEW_PREVIEW_COUNT)).map((r) => (
+                    <div key={r._id} className="bg-[#111113] border border-white/10 rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-2">
+                        <StarRow rating={r.rating} size="w-3.5 h-3.5" />
+                        <span className="text-xs text-gray-500">
+                          {new Date(r.createdAt).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+                      {r.comment && <p className="text-sm text-gray-300 mb-2">{r.comment}</p>}
+                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                        <User className="w-3 h-3" /> Verified buyer
+                      </p>
                     </div>
-                    {r.comment && <p className="text-sm text-gray-300 mb-2">{r.comment}</p>}
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
-                      <User className="w-3 h-3" /> Verified buyer
-                    </p>
-                  </div>
-                ))
+                  ))}
+                  {!showAllReviews && reviews.length > REVIEW_PREVIEW_COUNT && (
+                    <button
+                      onClick={() => setShowAllReviews(true)}
+                      className="text-sm font-medium text-white hover:text-gray-300 transition-colors self-start"
+                    >
+                      View all {reviews.length} reviews
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
