@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
 
 /* ------------------------------- Types ------------------------------- */
@@ -35,13 +36,10 @@ interface Review {
   createdAt: string;
 }
 
-function formatPrice(n: number) {
-  return `$${n.toFixed(2)}`;
-}
-
 /* -------------------------------- Page -------------------------------- */
 
 export default function ProductDetailPage() {
+  const { formatPrice } = useCurrency();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -517,6 +515,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
 function RelatedCard({ product }: { product: Product }) {
   const { addItem } = useCart();
   const toast = useToast();
+  const { formatPrice } = useCurrency();
   const inStock = product.stock > 0;
   const imgSrc = product.imageUrl || product.images?.[0];
   const onSale = !!product.discountPercent && product.discountPercent > 0;

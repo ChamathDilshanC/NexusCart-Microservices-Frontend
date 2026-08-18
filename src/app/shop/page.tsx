@@ -15,6 +15,7 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import { useCart } from "@/components/providers/CartProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
 
 /* ------------------------------- Types ------------------------------- */
@@ -39,9 +40,14 @@ interface Banner {
   subtitle?: string;
   imageUrl: string;
   linkUrl?: string;
+  productId?: string;
   order: number;
   isActive: boolean;
   templateIds?: string[];
+}
+
+function bannerHref(banner: Banner): string | undefined {
+  return banner.productId ? `/product/${banner.productId}` : banner.linkUrl || undefined;
 }
 
 type BannerLayout = "carousel" | "grid" | "spotlight";
@@ -80,6 +86,7 @@ type SortOption = "price_asc" | "price_desc" | "name_asc" | "newest";
 type Availability = "in_stock" | "out_of_stock";
 
 const PAGE_SIZE = 12;
+const SECTION_SIZE = 8;
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "newest", label: "Newest" },
@@ -94,10 +101,6 @@ const AVAILABILITY_OPTIONS: { value: Availability; label: string }[] = [
 ];
 
 const VALID_SORTS: SortOption[] = ["price_asc", "price_desc", "name_asc", "newest"];
-
-function formatPrice(n: number) {
-  return `$${n.toFixed(2)}`;
-}
 
 /* ----------------------------- Page shell ----------------------------- */
 
@@ -138,6 +141,8 @@ function ShopContent() {
   const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotal, setServerTotal] = useState(0);
 
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
@@ -151,6 +156,10 @@ function ShopContent() {
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [availability, setAvailability] = useState<Availability[]>([]);
+
+  // With no search/category filter active, the page shows every category as its
+  // own section instead of one flat paginated grid.
+  const isFlatMode = search.trim() !== "" || selectedCategories.length > 0;
 
   // Fetch categories + banners + banner templates once.
   useEffect(() => {
@@ -170,27 +179,47 @@ function ShopContent() {
     })();
   }, []);
 
-  // Debounced product fetch on search/category/sort change.
+  // Debounced product fetch on search/category/sort/page change. When no
+  // search/category filter is active we fetch the whole (sorted) catalog once
+  // and group it by category client-side; otherwise we fetch one paginated,
+  // server-filtered page at a time.
   useEffect(() => {
     setLoading(true);
     const handle = setTimeout(async () => {
       try {
         const params = new URLSearchParams();
         if (search.trim()) params.set("search", search.trim());
-        if (selectedCategories.length === 1) params.set("category", selectedCategories[0]);
+        if (selectedCategories.length > 0) params.set("category", selectedCategories.join(","));
         params.set("sort", sort);
-        const data = await apiFetch<Product[]>(`/products?${params.toString()}`, { auth: false });
-        setProducts(data);
+
+        if (isFlatMode) {
+          params.set("page", String(currentPage));
+          params.set("limit", String(PAGE_SIZE));
+          const data = await apiFetch<{ items: Product[]; total: number; totalPages: number }>(
+            `/products?${params.toString()}`,
+            { auth: false }
+          );
+          setProducts(data.items);
+          setServerTotal(data.total);
+          setServerTotalPages(data.totalPages);
+        } else {
+          const data = await apiFetch<Product[]>(`/products?${params.toString()}`, { auth: false });
+          setProducts(data);
+          setServerTotal(data.length);
+          setServerTotalPages(1);
+        }
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Failed to load products");
         setProducts([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
       } finally {
         setLoading(false);
       }
     }, 300);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, selectedCategories.join(","), sort]);
+  }, [search, selectedCategories.join(","), sort, isFlatMode, currentPage]);
 
   // Reset to page 1 whenever any filter changes.
   useEffect(() => {
@@ -244,11 +273,13 @@ function ShopContent() {
     [products]
   );
 
+  // Category filtering already happened server-side (see the fetch effect above)
+  // when isFlatMode is true; price/availability aren't query params, so they're
+  // always narrowed down client-side on top of whatever `products` holds.
   const filteredProducts = useMemo(() => {
     const min = priceMin.trim() === "" ? null : Number(priceMin);
     const max = priceMax.trim() === "" ? null : Number(priceMax);
     return products.filter((p) => {
-      if (selectedCategories.length > 0 && !selectedCategories.includes(p.category)) return false;
       if (min !== null && !Number.isNaN(min) && p.price < min) return false;
       if (max !== null && !Number.isNaN(max) && p.price > max) return false;
       if (availability.length > 0) {
@@ -257,11 +288,27 @@ function ShopContent() {
       }
       return true;
     });
-  }, [products, selectedCategories, priceMin, priceMax, availability]);
+  }, [products, priceMin, priceMax, availability]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const totalPages = isFlatMode ? serverTotalPages : 1;
   const safePage = Math.min(currentPage, totalPages);
-  const pageProducts = filteredProducts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Default (no filter) view: the same fetched catalog, split into one section
+  // per category so each can show a preview + a "View all" entry point.
+  const groupedByCategory = useMemo(() => {
+    if (isFlatMode) return [];
+    const byCategory = new Map<string, Product[]>();
+    for (const p of filteredProducts) {
+      const list = byCategory.get(p.category) ?? [];
+      list.push(p);
+      byCategory.set(p.category, list);
+    }
+    const orderedCategories = [
+      ...categories.filter((c) => byCategory.has(c)),
+      ...[...byCategory.keys()].filter((c) => !categories.includes(c)),
+    ];
+    return orderedCategories.map((category) => ({ category, items: byCategory.get(category)! }));
+  }, [filteredProducts, categories, isFlatMode]);
 
   const toggleCategory = (cat: string) => {
     setSelectedCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
@@ -307,7 +354,10 @@ function ShopContent() {
             <p className="text-sm text-gray-500 mt-1">
               {loading
                 ? "Loading…"
-                : `${filteredProducts.length} product${filteredProducts.length === 1 ? "" : "s"}`}
+                : (() => {
+                    const count = isFlatMode ? serverTotal : filteredProducts.length;
+                    return `${count} product${count === 1 ? "" : "s"}`;
+                  })()}
             </p>
           </div>
 
@@ -465,32 +515,64 @@ function ShopContent() {
                   <div key={i} className="aspect-[3/4] rounded-2xl bg-white/5 animate-pulse" />
                 ))}
               </div>
-            ) : pageProducts.length === 0 ? (
+            ) : isFlatMode ? (
+              filteredProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center py-24 bg-[#111113] border border-white/10 rounded-2xl">
+                  <div className="grid place-items-center h-14 w-14 rounded-full bg-white/5 mb-4">
+                    <ShoppingBag className="w-6 h-6 text-gray-500" />
+                  </div>
+                  <p className="text-white font-medium mb-1">No products found</p>
+                  <p className="text-gray-500 text-sm mb-6">Try adjusting your filters or search terms.</p>
+                  <button
+                    onClick={clearFilters}
+                    className="bg-white hover:bg-gray-200 text-black text-sm font-medium px-6 py-3 rounded-full transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredProducts.map((p) => (
+                      <ProductCard key={p._id} product={p} />
+                    ))}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <Pagination currentPage={safePage} totalPages={totalPages} onChange={setCurrentPage} />
+                  )}
+                </>
+              )
+            ) : groupedByCategory.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-24 bg-[#111113] border border-white/10 rounded-2xl">
                 <div className="grid place-items-center h-14 w-14 rounded-full bg-white/5 mb-4">
                   <ShoppingBag className="w-6 h-6 text-gray-500" />
                 </div>
                 <p className="text-white font-medium mb-1">No products found</p>
-                <p className="text-gray-500 text-sm mb-6">Try adjusting your filters or search terms.</p>
-                <button
-                  onClick={clearFilters}
-                  className="bg-white hover:bg-gray-200 text-black text-sm font-medium px-6 py-3 rounded-full transition-colors"
-                >
-                  Clear filters
-                </button>
+                <p className="text-gray-500 text-sm mb-6">Check back soon.</p>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {pageProducts.map((p) => (
-                    <ProductCard key={p._id} product={p} />
-                  ))}
-                </div>
-
-                {totalPages > 1 && (
-                  <Pagination currentPage={safePage} totalPages={totalPages} onChange={setCurrentPage} />
-                )}
-              </>
+              <div className="space-y-10">
+                {groupedByCategory.map(({ category, items }) => (
+                  <div key={category}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-semibold tracking-tight text-white">{category}</h2>
+                      <button
+                        onClick={() => toggleCategory(category)}
+                        className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors shrink-0"
+                      >
+                        View all
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {items.slice(0, SECTION_SIZE).map((p) => (
+                        <ProductCard key={p._id} product={p} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </section>
         </div>
@@ -610,9 +692,10 @@ function BannerSlide({ banner, active }: { banner: Banner; active: boolean }) {
     </>
   );
 
-  if (banner.linkUrl) {
+  const href = bannerHref(banner);
+  if (href) {
     return (
-      <a href={banner.linkUrl} className={className}>
+      <a href={href} className={className}>
         {content}
       </a>
     );
@@ -660,8 +743,9 @@ function BannerGrid({
               </div>
             </div>
           );
-          return banner.linkUrl ? (
-            <a key={banner._id} href={banner.linkUrl} className="block h-full">
+          const href = bannerHref(banner);
+          return href ? (
+            <a key={banner._id} href={href} className="block h-full">
               {card}
             </a>
           ) : (
@@ -703,8 +787,8 @@ function BannerSpotlight({
     <div className="max-w-7xl mx-auto px-6 py-8">
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="lg:w-2/3">
-          {featured.linkUrl ? (
-            <a href={featured.linkUrl} className="block">
+          {bannerHref(featured) ? (
+            <a href={bannerHref(featured)} className="block">
               {featuredCard}
             </a>
           ) : (
@@ -728,8 +812,9 @@ function BannerSpotlight({
                   </div>
                 </div>
               );
-              return banner.linkUrl ? (
-                <a key={banner._id} href={banner.linkUrl} className="block">
+              const href = bannerHref(banner);
+              return href ? (
+                <a key={banner._id} href={href} className="block">
                   {row}
                 </a>
               ) : (
@@ -767,6 +852,7 @@ function ProductImage({
 function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
   const toast = useToast();
+  const { formatPrice } = useCurrency();
   const inStock = product.stock > 0;
   const imgSrc = product.imageUrl || product.images?.[0];
   const onSale = !!product.discountPercent && product.discountPercent > 0;

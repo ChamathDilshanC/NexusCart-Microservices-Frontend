@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
 
 /* ------------------------------- Types ------------------------------- */
@@ -47,15 +48,12 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: React.ReactN
   { value: "Digital Wallet", label: "Digital Wallet", icon: <Wallet className="w-4 h-4" /> },
 ];
 
-function formatPrice(n: number) {
-  return `$${n.toFixed(2)}`;
-}
-
 /* -------------------------------- Page -------------------------------- */
 
 export default function CheckoutPage() {
   const router = useRouter();
   const toast = useToast();
+  const { formatPrice } = useCurrency();
   const { items, subtotal, clear } = useCart();
   const { currentUser, isAuthInitialized } = useAppState();
 

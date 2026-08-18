@@ -18,13 +18,14 @@ import {
   Percent,
   Search,
   Receipt,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 
 /* ---------------------------------- Types ---------------------------------- */
 
-type TabId = "products" | "orders" | "users" | "banners" | "promotions";
+type TabId = "products" | "orders" | "users" | "banners" | "promotions" | "settings";
 type IconType = React.ComponentType<{ className?: string }>;
 
 interface Metrics {
@@ -91,6 +92,7 @@ interface Banner {
   subtitle?: string;
   imageUrl: string;
   linkUrl?: string;
+  productId?: string;
   order: number;
   isActive: boolean;
   templateIds?: string[];
@@ -112,6 +114,7 @@ interface BannerFormValues {
   subtitle: string;
   imageUrl: string;
   linkUrl: string;
+  productId: string;
   order: number;
   isActive: boolean;
   templateIds: string[];
@@ -188,6 +191,13 @@ interface PromotionFormValues {
   isActive: boolean;
 }
 
+const ALL_CURRENCIES = ["USD", "LKR", "EUR", "GBP", "INR", "AUD", "CAD", "JPY", "SGD", "AED"];
+
+interface CurrencySettings {
+  baseCurrency: string;
+  supportedCurrencies: string[];
+}
+
 /* ---------------------------------- Shared styles ---------------------------------- */
 
 const inputClass =
@@ -206,6 +216,7 @@ const TABS: { id: TabId; label: string; icon: IconType }[] = [
   { id: "users", label: "Users", icon: Users },
   { id: "banners", label: "Banners", icon: ImagePlus },
   { id: "promotions", label: "Promotions", icon: Percent },
+  { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 /* ---------------------------------- Helpers ---------------------------------- */
@@ -580,12 +591,14 @@ function ProductForm({
 function BannerForm({
   initial,
   templates,
+  products,
   submitting,
   onCancel,
   onSubmit,
 }: {
   initial: Banner | null;
   templates: BannerTemplate[];
+  products: Product[];
   submitting: boolean;
   onCancel: () => void;
   onSubmit: (values: BannerFormValues) => void;
@@ -593,6 +606,7 @@ function BannerForm({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [subtitle, setSubtitle] = useState(initial?.subtitle ?? "");
   const [linkUrl, setLinkUrl] = useState(initial?.linkUrl ?? "");
+  const [productId, setProductId] = useState(initial?.productId ?? "");
   const [order, setOrder] = useState(initial ? String(initial.order) : "0");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
@@ -613,6 +627,7 @@ function BannerForm({
       title: title.trim(),
       subtitle: subtitle.trim(),
       linkUrl: linkUrl.trim(),
+      productId,
       order: Number.parseInt(order, 10) || 0,
       isActive,
       imageUrl: imageUrl.trim(),
@@ -643,6 +658,23 @@ function BannerForm({
         />
       </div>
 
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Tag a product</label>
+        <select value={productId} onChange={(e) => setProductId(e.target.value)} className={inputClass}>
+          <option value="" className="bg-[#111113]">
+            No product — use link URL below
+          </option>
+          {products.map((p) => (
+            <option key={p._id} value={p._id} className="bg-[#111113]">
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-600 mt-1.5">
+          Clicking the banner will open this product&apos;s page instead of the link URL.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="text-xs text-gray-500 mb-1.5 block">Link URL</label>
@@ -650,7 +682,8 @@ function BannerForm({
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
             placeholder="/shop"
-            className={inputClass}
+            disabled={!!productId}
+            className={`${inputClass} disabled:opacity-40 disabled:cursor-not-allowed`}
           />
         </div>
         <div>
@@ -1454,6 +1487,7 @@ function BannerTemplatesSection({
 function BannersSection({
   banners,
   templates,
+  products,
   onCreateTemplate,
   onUpdateTemplate,
   onDeleteTemplate,
@@ -1464,6 +1498,7 @@ function BannersSection({
 }: {
   banners: Banner[];
   templates: BannerTemplate[];
+  products: Product[];
   onCreateTemplate: (values: BannerTemplateFormValues) => Promise<void>;
   onUpdateTemplate: (id: string, values: BannerTemplateFormValues) => Promise<void>;
   onDeleteTemplate: (template: BannerTemplate) => Promise<void>;
@@ -1545,7 +1580,12 @@ function BannersSection({
                 </div>
                 <p className="text-xs text-gray-500 mt-1 truncate">
                   {banner.subtitle ? `${banner.subtitle} · ` : ""}Order {banner.order}
-                  {banner.linkUrl ? ` · ${banner.linkUrl}` : ""} ·{" "}
+                  {banner.productId
+                    ? ` · → ${products.find((p) => p._id === banner.productId)?.name ?? "Unknown product"}`
+                    : banner.linkUrl
+                      ? ` · ${banner.linkUrl}`
+                      : ""}{" "}
+                  ·{" "}
                   {banner.templateIds && banner.templateIds.length > 0
                     ? banner.templateIds
                         .map((id) => templates.find((t) => t._id === id)?.name ?? "Unknown template")
@@ -1586,6 +1626,7 @@ function BannersSection({
           <BannerForm
             initial={editing}
             templates={templates}
+            products={products}
             submitting={submitting}
             onCancel={closeForm}
             onSubmit={handleSubmit}
@@ -1893,6 +1934,84 @@ function PromotionsSection({
   );
 }
 
+/* ---------------------------------- Settings tab ---------------------------------- */
+
+function SettingsSection({
+  settings,
+  onUpdate,
+}: {
+  settings: CurrencySettings;
+  onUpdate: (values: CurrencySettings) => Promise<void>;
+}) {
+  const [baseCurrency, setBaseCurrency] = useState(settings.baseCurrency);
+  const [supported, setSupported] = useState<string[]>(settings.supportedCurrencies);
+  const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
+
+  const toggleCurrency = (code: string) => {
+    setSupported((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supported.includes(baseCurrency)) {
+      toast.error("The base currency must also be a supported currency");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onUpdate({ baseCurrency, supportedCurrencies: supported });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className={cardClass}>
+      <h2 className="text-sm font-semibold text-white mb-1">Currency</h2>
+      <p className="text-xs text-gray-500 mb-6">
+        Controls which currencies shoppers can switch between. Prices are stored and charged in the base
+        currency — other currencies are a live, converted estimate only.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-5 max-w-md">
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Base currency</label>
+          <select value={baseCurrency} onChange={(e) => setBaseCurrency(e.target.value)} className={inputClass}>
+            {ALL_CURRENCIES.map((code) => (
+              <option key={code} value={code} className="bg-[#111113]">
+                {code}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Currencies shoppers can switch to</label>
+          <div className="flex flex-wrap gap-4">
+            {ALL_CURRENCIES.map((code) => (
+              <label key={code} className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={supported.includes(code)}
+                  onChange={() => toggleCurrency(code)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+                />
+                <span className="text-sm text-gray-300">{code}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button type="submit" disabled={submitting} className={primaryButtonClass}>
+            {submitting ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* ---------------------------------- Main dashboard ---------------------------------- */
 
 export function AdminDashboard() {
@@ -1908,6 +2027,10 @@ export function AdminDashboard() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [currencySettings, setCurrencySettings] = useState<CurrencySettings>({
+    baseCurrency: "USD",
+    supportedCurrencies: ["USD"],
+  });
 
   const fetchMetrics = useCallback(async () => {
     const data = await apiFetch<Metrics>("/admin/metrics");
@@ -1941,6 +2064,10 @@ export function AdminDashboard() {
     const data = await apiFetch<Promotion[]>("/admin/promotions");
     setPromotions(data);
   }, []);
+  const fetchCurrencySettings = useCallback(async () => {
+    const data = await apiFetch<CurrencySettings>("/admin/settings/currency");
+    setCurrencySettings(data);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1956,6 +2083,7 @@ export function AdminDashboard() {
           fetchBanners(),
           fetchBannerTemplates(),
           fetchPromotions(),
+          fetchCurrencySettings(),
         ]);
       } catch (err) {
         if (!cancelled) toast.error(errorMessage(err, "Failed to load admin dashboard"));
@@ -2125,6 +2253,18 @@ export function AdminDashboard() {
     }
   };
 
+  /* ---- Settings ---- */
+
+  const handleUpdateCurrencySettings = async (values: CurrencySettings) => {
+    try {
+      const data = await apiFetch<CurrencySettings>("/admin/settings/currency", { method: "PUT", body: values });
+      setCurrencySettings(data);
+      toast.success("Currency settings updated");
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to update currency settings"));
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-8">Admin console</h1>
@@ -2190,6 +2330,7 @@ export function AdminDashboard() {
             <BannersSection
               banners={banners}
               templates={bannerTemplates}
+              products={products}
               onCreateTemplate={handleCreateBannerTemplate}
               onUpdateTemplate={handleUpdateBannerTemplate}
               onDeleteTemplate={handleDeleteBannerTemplate}
@@ -2208,6 +2349,9 @@ export function AdminDashboard() {
               onUpdate={handleUpdatePromotion}
               onDelete={handleDeletePromotion}
             />
+          )}
+          {activeTab === "settings" && (
+            <SettingsSection settings={currencySettings} onUpdate={handleUpdateCurrencySettings} />
           )}
         </>
       )}

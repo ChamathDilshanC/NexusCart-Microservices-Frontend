@@ -6,6 +6,7 @@ import { Menu, X, ShoppingBag, User as UserIcon, LogOut, LayoutDashboard } from 
 import { useAppState } from "./providers/AppStateProvider";
 import { useCart } from "./providers/CartProvider";
 import { clearSession } from "@/lib/api";
+import { CurrencySwitcher } from "./CurrencySwitcher";
 
 export function AppHeader() {
   const { currentUser, setCurrentUser, isAuthInitialized } = useAppState();
@@ -44,6 +45,10 @@ export function AppHeader() {
           </nav>
 
           <div className="flex items-center gap-3">
+            <div className="hidden md:block">
+              <CurrencySwitcher />
+            </div>
+
             <Link
               href="/cart"
               className="relative grid place-items-center h-10 w-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
@@ -107,6 +112,8 @@ export function AppHeader() {
 
       {menuOpen && (
         <div className="md:hidden border-t border-white/5 px-6 py-4 flex flex-col gap-4 bg-black/95">
+          <CurrencySwitcher />
+
           <Link href="/shop" onClick={() => setMenuOpen(false)} className="text-sm text-gray-300 hover:text-white">
             Shop
           </Link>

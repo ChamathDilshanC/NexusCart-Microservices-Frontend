@@ -5,13 +5,11 @@ import Link from "next/link";
 import { ShoppingBag, Trash2, Minus, Plus, ImageOff } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { useCart } from "@/components/providers/CartProvider";
-
-function formatPrice(n: number) {
-  return `$${n.toFixed(2)}`;
-}
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 
 export default function CartPage() {
   const { items, subtotal, updateQuantity, removeItem, clear } = useCart();
+  const { formatPrice } = useCurrency();
 
   const shipping = subtotal > 50 ? 0 : 5.99;
   const total = subtotal + shipping;
