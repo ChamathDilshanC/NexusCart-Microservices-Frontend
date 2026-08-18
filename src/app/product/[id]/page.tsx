@@ -87,7 +87,22 @@ export default function ProductDetailPage() {
         ]);
         if (cancelled) return;
         if (relatedResult.status === "fulfilled") {
-          setRelated(relatedResult.value.filter((r) => r._id !== p._id).slice(0, 4));
+          const sameCategory = relatedResult.value.filter((r) => r._id !== p._id);
+          if (sameCategory.length >= 4) {
+            setRelated(sameCategory.slice(0, 4));
+          } else {
+            // Not enough products share this exact category — top up with other
+            // products so the recommendation section still shows something useful.
+            try {
+              const others = await apiFetch<Product[]>(`/products?sort=newest`, { auth: false });
+              if (cancelled) return;
+              const usedIds = new Set([p._id, ...sameCategory.map((r) => r._id)]);
+              const fallback = others.filter((r) => !usedIds.has(r._id));
+              setRelated([...sameCategory, ...fallback].slice(0, 4));
+            } catch {
+              if (!cancelled) setRelated(sameCategory.slice(0, 4));
+            }
+          }
         }
         if (reviewsResult.status === "fulfilled") {
           setReviews(reviewsResult.value);
