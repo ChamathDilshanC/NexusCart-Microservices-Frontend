@@ -21,6 +21,7 @@ import {
   Settings as SettingsIcon,
   RefreshCw,
   Sparkles,
+  Info,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -193,6 +194,55 @@ const SIZE_OPTIONS: { value: BannerSize; label: string }[] = [
   { value: "full", label: "Full screen" },
 ];
 
+// Actual width/height each size resolves to on the shop page — every layout
+// maps the same four steps to a different dimension, so this is keyed by
+// layout too. Keep in sync with the BANNER_CONTAINER_WIDTH / *_HEIGHT_CLASSES
+// / *_ROW_CLASSES / *_CARD_CLASSES tables in components/shop/ShopBrowser.tsx.
+const SIZE_DIMENSIONS: Record<BannerLayout, Record<BannerSize, string>> = {
+  carousel: {
+    small: "Full width, 200–280px tall",
+    medium: "Full width, 280–380px tall",
+    large: "Full width, 360–480px tall",
+    full: "Full width, 70–88% of screen height",
+  },
+  grid: {
+    small: "Section up to 1280px wide",
+    medium: "Section up to 1600px wide",
+    large: "Section up to 1920px wide",
+    full: "Section spans the full screen width",
+  },
+  spotlight: {
+    small: "Up to 1280px wide, featured banner 200–300px tall",
+    medium: "Up to 1600px wide, featured banner 280–420px tall",
+    large: "Up to 1920px wide, featured banner 340–500px tall",
+    full: "Full width, featured banner 60–75% of screen height",
+  },
+  sidebar: {
+    small: "Rail width 160px",
+    medium: "Rail width 192px",
+    large: "Rail width 224px",
+    full: "Rail width 256px",
+  },
+  showcase: {
+    small: "Up to 1280px wide, row 160–240px tall",
+    medium: "Up to 1600px wide, row 220–320px tall",
+    large: "Up to 1920px wide, row 280–400px tall",
+    full: "Full width, row 55–70% of screen height",
+  },
+  bento: {
+    small: "Up to 1280px wide, tile rows 100–115px",
+    medium: "Up to 1600px wide, tile rows 130–150px",
+    large: "Up to 1920px wide, tile rows 160–190px",
+    full: "Full width, tile rows 200–240px",
+  },
+  marquee: {
+    small: "Cards ~224×128px – 288×176px",
+    medium: "Cards ~288×160px – 384×224px",
+    large: "Cards ~320×192px – 420×256px",
+    full: "Cards ~384×224px – 480×288px",
+  },
+};
+
 const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
   carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true },
   grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
@@ -308,6 +358,23 @@ function StatCard({ label, value, icon: Icon }: { label: string; value: string; 
 function EmptyState({ message }: { message: string }) {
   return (
     <div className={`${cardClass} text-center text-sm text-gray-500`}>{message}</div>
+  );
+}
+
+function InfoTooltip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="relative inline-flex group">
+      <button
+        type="button"
+        aria-label="Size details"
+        className="text-gray-500 hover:text-white transition-colors"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-72 -translate-x-1/2 rounded-xl border border-white/10 bg-[#1a1a1c] p-3 text-xs opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {children}
+      </span>
+    </span>
   );
 }
 
@@ -1362,7 +1429,22 @@ function BannerTemplateForm({
       </div>
 
       <div>
-        <label className="text-xs text-gray-500 mb-1.5 block">Size</label>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <label className="text-xs text-gray-500 block">Size</label>
+          <InfoTooltip>
+            <p className="font-medium text-white mb-2">
+              {LAYOUT_TEMPLATES.find((l) => l.id === layout)?.label ?? layout} dimensions
+            </p>
+            <ul className="space-y-1.5">
+              {SIZE_OPTIONS.map((opt) => (
+                <li key={opt.value} className="flex items-baseline justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">{opt.label}</span>
+                  <span className="text-gray-300 text-right">{SIZE_DIMENSIONS[layout][opt.value]}</span>
+                </li>
+              ))}
+            </ul>
+          </InfoTooltip>
+        </div>
         <SegmentedControl value={size} onChange={setSize} options={SIZE_OPTIONS} />
         <p className="text-xs text-gray-600 mt-1.5">
           How prominent this banner block is on the shop page — applies no matter which layout you pick above.
