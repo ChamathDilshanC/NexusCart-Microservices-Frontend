@@ -17,6 +17,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
 import { flyToCart } from "@/lib/flyToCart";
+import { getCached, setCached } from "@/lib/requestCache";
 
 /* ------------------------------- Types ------------------------------- */
 
@@ -168,20 +169,40 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
 
   // Fetch categories always; banners/templates only on /shop (alwaysFlat) —
   // /shop/allitems is a plain category directory and shouldn't show them.
+  // Cached results render immediately (no empty-filters flash when coming
+  // back to /shop), then get silently refreshed in the background.
   useEffect(() => {
+    const catsKey = "/products/categories";
+    const bnrsKey = "/products/banners";
+    const tplsKey = "/products/banner-templates";
+
+    const cachedCats = getCached<string[]>(catsKey);
+    if (cachedCats) setCategories(cachedCats);
+    if (alwaysFlat) {
+      const cachedBnrs = getCached<Banner[]>(bnrsKey);
+      const cachedTpls = getCached<BannerTemplate[]>(tplsKey);
+      if (cachedBnrs) setBanners(cachedBnrs);
+      if (cachedTpls) setBannerTemplates(cachedTpls);
+    }
+
     (async () => {
       try {
         if (alwaysFlat) {
           const [cats, bnrs, tpls] = await Promise.all([
-            apiFetch<string[]>("/products/categories", { auth: false }),
-            apiFetch<Banner[]>("/products/banners", { auth: false }),
-            apiFetch<BannerTemplate[]>("/products/banner-templates", { auth: false }).catch(() => []),
+            apiFetch<string[]>(catsKey, { auth: false }),
+            apiFetch<Banner[]>(bnrsKey, { auth: false }),
+            apiFetch<BannerTemplate[]>(tplsKey, { auth: false }).catch(() => []),
           ]);
           setCategories(cats);
+          setCached(catsKey, cats);
           setBanners(bnrs);
+          setCached(bnrsKey, bnrs);
           setBannerTemplates(tpls);
+          setCached(tplsKey, tpls);
         } else {
-          setCategories(await apiFetch<string[]>("/products/categories", { auth: false }));
+          const cats = await apiFetch<string[]>(catsKey, { auth: false });
+          setCategories(cats);
+          setCached(catsKey, cats);
         }
       } catch {
         // Non-fatal: filters/banner section simply stay empty.
@@ -192,37 +213,61 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   // Debounced product fetch on search/category/sort/page change. When no
   // search/category filter is active (and alwaysFlat is off) we fetch the
   // whole (sorted) catalog once and group it by category client-side;
-  // otherwise we fetch one paginated, server-filtered page at a time.
+  // otherwise we fetch one paginated, server-filtered page at a time. A
+  // cache hit for the exact same query renders instantly (skipping the
+  // loading skeleton) while a fresh copy is still fetched underneath it.
   useEffect(() => {
-    setLoading(true);
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (selectedCategories.length > 0) params.set("category", selectedCategories.join(","));
+    params.set("sort", sort);
+    if (isFlatMode) {
+      params.set("page", String(currentPage));
+      params.set("limit", String(PAGE_SIZE));
+    }
+    const url = `/products?${params.toString()}`;
+
+    type FlatPage = { items: Product[]; total: number; totalPages: number };
+    const cached = isFlatMode ? getCached<FlatPage>(url) : getCached<Product[]>(url);
+    if (cached) {
+      if (isFlatMode) {
+        const c = cached as FlatPage;
+        setProducts(c.items);
+        setServerTotal(c.total);
+        setServerTotalPages(c.totalPages);
+      } else {
+        const c = cached as Product[];
+        setProducts(c);
+        setServerTotal(c.length);
+        setServerTotalPages(1);
+      }
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     const handle = setTimeout(async () => {
       try {
-        const params = new URLSearchParams();
-        if (search.trim()) params.set("search", search.trim());
-        if (selectedCategories.length > 0) params.set("category", selectedCategories.join(","));
-        params.set("sort", sort);
-
         if (isFlatMode) {
-          params.set("page", String(currentPage));
-          params.set("limit", String(PAGE_SIZE));
-          const data = await apiFetch<{ items: Product[]; total: number; totalPages: number }>(
-            `/products?${params.toString()}`,
-            { auth: false }
-          );
+          const data = await apiFetch<FlatPage>(url, { auth: false });
           setProducts(data.items);
           setServerTotal(data.total);
           setServerTotalPages(data.totalPages);
+          setCached(url, data);
         } else {
-          const data = await apiFetch<Product[]>(`/products?${params.toString()}`, { auth: false });
+          const data = await apiFetch<Product[]>(url, { auth: false });
           setProducts(data);
           setServerTotal(data.length);
           setServerTotalPages(1);
+          setCached(url, data);
         }
       } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Failed to load products");
-        setProducts([]);
-        setServerTotal(0);
-        setServerTotalPages(1);
+        if (!cached) {
+          toast.error(err instanceof ApiError ? err.message : "Failed to load products");
+          setProducts([]);
+          setServerTotal(0);
+          setServerTotalPages(1);
+        }
       } finally {
         setLoading(false);
       }

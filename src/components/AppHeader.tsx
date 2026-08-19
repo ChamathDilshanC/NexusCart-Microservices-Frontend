@@ -37,6 +37,12 @@ export function AppHeader() {
               Shop
             </Link>
             <Link
+              href="/shop/allitems"
+              className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
+            >
+              Categories
+            </Link>
+            <Link
               href="/shop?sort=newest"
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
             >
@@ -117,6 +123,13 @@ export function AppHeader() {
 
           <Link href="/shop" onClick={() => setMenuOpen(false)} className="text-sm text-gray-300 hover:text-white">
             Shop
+          </Link>
+          <Link
+            href="/shop/allitems"
+            onClick={() => setMenuOpen(false)}
+            className="text-sm text-gray-300 hover:text-white"
+          >
+            Categories
           </Link>
           <Link
             href="/shop?sort=newest"

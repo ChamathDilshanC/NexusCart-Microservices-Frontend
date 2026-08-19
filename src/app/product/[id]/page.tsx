@@ -11,6 +11,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
 import { flyToCart } from "@/lib/flyToCart";
+import { getCached, setCached } from "@/lib/requestCache";
 
 /* ------------------------------- Types ------------------------------- */
 
@@ -68,31 +69,44 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const productKey = `/products/${id}`;
+    const reviewsKey = `/reviews/product/${id}`;
+    // A cached product renders immediately — no full-page skeleton flash
+    // when re-opening a product you've already viewed — while a fresh
+    // copy still loads underneath it.
+    const cachedProduct = getCached<Product>(productKey);
+    const cachedReviews = getCached<Review[]>(reviewsKey);
+
     setNotFound(false);
-    setProduct(null);
+    setProduct(cachedProduct ?? null);
     setRelated([]);
-    setReviews([]);
+    setReviews(cachedReviews ?? []);
     setActiveImage(0);
     setQuantity(1);
     setReviewRating(0);
     setReviewComment("");
     setReviewError("");
+    setLoading(!cachedProduct);
 
     (async () => {
       try {
         // Product and reviews both only depend on `id`, so fetch them together
         // instead of waiting on the product before starting the reviews call.
         const [productResult, reviewsResult] = await Promise.allSettled([
-          apiFetch<Product>(`/products/${id}`, { auth: false }),
-          apiFetch<Review[]>(`/reviews/product/${id}`, { auth: false }),
+          apiFetch<Product>(productKey, { auth: false }),
+          apiFetch<Review[]>(reviewsKey, { auth: false }),
         ]);
         if (cancelled) return;
-        if (productResult.status !== "fulfilled") throw productResult.reason;
+        if (productResult.status !== "fulfilled") {
+          if (cachedProduct) return; // keep showing the cached product; refresh just failed
+          throw productResult.reason;
+        }
         const p = productResult.value;
         setProduct(p);
+        setCached(productKey, p);
         if (reviewsResult.status === "fulfilled") {
           setReviews(reviewsResult.value);
+          setCached(reviewsKey, reviewsResult.value);
         }
 
         // Bounded (page+limit) so this never pulls down an entire category —
@@ -141,6 +155,7 @@ export default function ProductDetailPage() {
     try {
       const data = await apiFetch<Review[]>(`/reviews/product/${id}`, { auth: false });
       setReviews(data);
+      setCached(`/reviews/product/${id}`, data);
     } catch {
       // Non-fatal — the newly submitted review just won't show until next load.
     }
