@@ -163,6 +163,24 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   const [priceMax, setPriceMax] = useState("");
   const [availability, setAvailability] = useState<Availability[]>([]);
 
+  // The state above only reads the URL once, on first mount — Next.js keeps
+  // this same component instance across /shop -> /shop?sort=newest
+  // navigations (same route), so without this, clicking a nav link like
+  // "New Arrivals" while already on /shop with other filters/sort active
+  // silently did nothing. Re-derive from the URL on every navigation, same
+  // as a fresh mount would, so each nav link always lands on a clean view.
+  useEffect(() => {
+    const s = searchParams.get("sort");
+    setSort(s && (VALID_SORTS as string[]).includes(s) ? (s as SortOption) : "newest");
+    const c = searchParams.get("category");
+    setSelectedCategories(c ? [c] : []);
+    setSearch("");
+    setPriceMin("");
+    setPriceMax("");
+    setAvailability([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // With no search/category filter active, /shop/allitems shows every category
   // as its own section instead of one flat paginated grid; /shop always stays flat.
   const isFlatMode = alwaysFlat || search.trim() !== "" || selectedCategories.length > 0;
