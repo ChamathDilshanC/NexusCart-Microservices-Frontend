@@ -10,6 +10,7 @@ import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
+import { flyToCart } from "@/lib/flyToCart";
 
 /* ------------------------------- Types ------------------------------- */
 
@@ -80,35 +81,49 @@ export default function ProductDetailPage() {
 
     (async () => {
       try {
-        const p = await apiFetch<Product>(`/products/${id}`, { auth: false });
-        if (cancelled) return;
-        setProduct(p);
-
-        const [relatedResult, reviewsResult] = await Promise.allSettled([
-          apiFetch<Product[]>(`/products?category=${encodeURIComponent(p.category)}`, { auth: false }),
+        // Product and reviews both only depend on `id`, so fetch them together
+        // instead of waiting on the product before starting the reviews call.
+        const [productResult, reviewsResult] = await Promise.allSettled([
+          apiFetch<Product>(`/products/${id}`, { auth: false }),
           apiFetch<Review[]>(`/reviews/product/${id}`, { auth: false }),
         ]);
         if (cancelled) return;
-        if (relatedResult.status === "fulfilled") {
-          const sameCategory = relatedResult.value.filter((r) => r._id !== p._id);
+        if (productResult.status !== "fulfilled") throw productResult.reason;
+        const p = productResult.value;
+        setProduct(p);
+        if (reviewsResult.status === "fulfilled") {
+          setReviews(reviewsResult.value);
+        }
+
+        // Bounded (page+limit) so this never pulls down an entire category —
+        // or, in the fallback below, the entire catalog — just to show 4 cards.
+        try {
+          const page = await apiFetch<{ items: Product[] }>(
+            `/products?category=${encodeURIComponent(p.category)}&page=1&limit=8`,
+            { auth: false }
+          );
+          if (cancelled) return;
+          const sameCategory = page.items.filter((r) => r._id !== p._id);
           if (sameCategory.length >= 4) {
             setRelated(sameCategory.slice(0, 4));
           } else {
             // Not enough products share this exact category — top up with other
             // products so the recommendation section still shows something useful.
             try {
-              const others = await apiFetch<Product[]>(`/products?sort=newest`, { auth: false });
+              const fallbackPage = await apiFetch<{ items: Product[] }>(
+                `/products?sort=newest&page=1&limit=8`,
+                { auth: false }
+              );
               if (cancelled) return;
               const usedIds = new Set([p._id, ...sameCategory.map((r) => r._id)]);
-              const fallback = others.filter((r) => !usedIds.has(r._id));
+              const fallback = fallbackPage.items.filter((r) => !usedIds.has(r._id));
               setRelated([...sameCategory, ...fallback].slice(0, 4));
             } catch {
               if (!cancelled) setRelated(sameCategory.slice(0, 4));
             }
           }
-        }
-        if (reviewsResult.status === "fulfilled") {
-          setReviews(reviewsResult.value);
+        } catch {
+          // Non-fatal: the related-products section just stays empty.
         }
       } catch {
         if (!cancelled) setNotFound(true);
@@ -140,6 +155,7 @@ export default function ProductDetailPage() {
     toast.success(`${product.name} added to cart`);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
+    flyToCart(document.getElementById("product-gallery-image"));
   };
 
   const decQuantity = () => setQuantity((q) => Math.max(1, q - 1));
@@ -242,7 +258,7 @@ export default function ProductDetailPage() {
         <div className="grid md:grid-cols-2 gap-12">
           {/* Gallery */}
           <div className="flex flex-col gap-4">
-            <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-[#111113] border border-white/10">
+            <div id="product-gallery-image" className="relative aspect-square w-full rounded-2xl overflow-hidden bg-[#111113] border border-white/10">
               {mainImage ? (
                 <img src={mainImage} alt={product.name} className="w-full h-full object-cover" />
               ) : (
@@ -534,11 +550,12 @@ function RelatedCard({ product }: { product: Product }) {
   const onSale = !!product.discountPercent && product.discountPercent > 0;
   const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     addItem({ productId: product._id, name: product.name, price: displayPrice, imageUrl: imgSrc }, 1);
     toast.success(`${product.name} added to cart`);
+    flyToCart(e.currentTarget.closest("a"));
   };
 
   return (

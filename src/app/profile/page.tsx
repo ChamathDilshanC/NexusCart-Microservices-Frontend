@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Mail, MapPin, PackageOpen, ShoppingBag, Receipt } from "lucide-react";
+import { Loader2, Mail, MapPin, PackageOpen, ShoppingBag, Receipt, XCircle, Check } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -43,6 +43,67 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   DELIVERED: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
   CANCELLED: "bg-red-500/10 text-red-300 border-red-500/20",
 };
+
+const FLOW_STEPS: { key: OrderStatus; label: string }[] = [
+  { key: "PENDING", label: "Placed" },
+  { key: "PAID", label: "Paid" },
+  { key: "SHIPPED", label: "Shipped" },
+  { key: "DELIVERED", label: "Delivered" },
+];
+
+/* Horizontal progress tracker for an order's lifecycle. Cancelled orders
+   fall outside the linear flow, so they get their own terminal banner
+   instead of trying to plot a cancellation point on the stepper. */
+function OrderStatusFlow({ status }: { status: OrderStatus }) {
+  if (status === "CANCELLED") {
+    return (
+      <div className="flex items-center gap-2 text-xs font-medium text-red-300 bg-red-500/5 border border-red-500/15 rounded-xl px-3 py-2.5">
+        <XCircle className="w-4 h-4 shrink-0" />
+        This order was cancelled
+      </div>
+    );
+  }
+
+  const activeIndex = FLOW_STEPS.findIndex((s) => s.key === status);
+
+  return (
+    <div className="flex items-start">
+      {FLOW_STEPS.map((step, i) => {
+        const done = i <= activeIndex;
+        const isActive = i === activeIndex;
+        return (
+          <React.Fragment key={step.key}>
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
+              <div
+                className={`grid place-items-center h-5 w-5 rounded-full border transition-colors ${
+                  done
+                    ? "bg-emerald-400 border-emerald-400 text-black"
+                    : "bg-white/5 border-white/15 text-transparent"
+                } ${isActive ? "ring-4 ring-emerald-400/20" : ""}`}
+              >
+                {done && <Check className="w-3 h-3" strokeWidth={3} />}
+              </div>
+              <span
+                className={`text-[10px] font-medium whitespace-nowrap ${
+                  isActive ? "text-white" : done ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+            {i < FLOW_STEPS.length - 1 && (
+              <div
+                className={`flex-1 h-px mt-2.5 mx-1.5 transition-colors ${
+                  i < activeIndex ? "bg-emerald-400" : "bg-white/10"
+                }`}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -193,6 +254,8 @@ export default function ProfilePage() {
                         <span className="text-sm font-semibold text-white">{formatCurrency(order.totalAmount)}</span>
                       </div>
                     </div>
+
+                    <OrderStatusFlow status={order.status} />
 
                     <div className="flex flex-wrap gap-2">
                       {order.items.map((item, idx) => (

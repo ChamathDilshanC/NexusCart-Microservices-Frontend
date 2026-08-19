@@ -16,6 +16,7 @@ import { useCart } from "@/components/providers/CartProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
+import { flyToCart } from "@/lib/flyToCart";
 
 /* ------------------------------- Types ------------------------------- */
 
@@ -1104,11 +1105,12 @@ function ProductCard({ product }: { product: Product }) {
   const onSale = !!product.discountPercent && product.discountPercent > 0;
   const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     addItem({ productId: product._id, name: product.name, price: displayPrice, imageUrl: imgSrc }, 1);
     toast.success(`${product.name} added to cart`);
+    flyToCart(e.currentTarget.closest("a"));
   };
 
   return (

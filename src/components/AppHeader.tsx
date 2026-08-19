@@ -50,6 +50,7 @@ export function AppHeader() {
             </div>
 
             <Link
+              id="nav-cart-icon"
               href="/cart"
               className="relative grid place-items-center h-10 w-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
               aria-label="Cart"
