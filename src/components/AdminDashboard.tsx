@@ -19,6 +19,8 @@ import {
   Search,
   Receipt,
   Settings as SettingsIcon,
+  RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -220,6 +222,14 @@ const secondaryButtonClass =
 const cardClass = "bg-[#111113] border border-white/10 rounded-2xl p-6";
 
 const STATUS_OPTIONS: OrderStatus[] = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"];
+
+const STATUS_STYLES: Record<OrderStatus, string> = {
+  PENDING: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+  PAID: "bg-blue-500/10 text-blue-300 border-blue-500/20",
+  SHIPPED: "bg-violet-500/10 text-violet-300 border-violet-500/20",
+  DELIVERED: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+  CANCELLED: "bg-red-500/10 text-red-300 border-red-500/20",
+};
 
 const TABS: { id: TabId; label: string; icon: IconType }[] = [
   { id: "products", label: "Products", icon: Package },
@@ -920,11 +930,14 @@ function ProductsSection({
 function OrdersSection({
   orders,
   onStatusChange,
+  onRefresh,
 }: {
   orders: Order[];
   onStatusChange: (order: Order, status: OrderStatus) => Promise<void>;
+  onRefresh: () => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleChange = async (order: Order, status: OrderStatus) => {
     setUpdating((prev) => new Set(prev).add(order._id));
@@ -939,11 +952,38 @@ function OrdersSection({
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const newCount = orders.filter((o) => o.status === "PENDING").length;
+
   return (
     <div className="space-y-6">
-      <h2 className="text-sm text-gray-500">
-        {orders.length} order{orders.length !== 1 ? "s" : ""}
-      </h2>
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm text-gray-500">
+          {orders.length} order{orders.length !== 1 ? "s" : ""}
+        </h2>
+        {newCount > 0 && (
+          <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+            <Sparkles className="w-3 h-3" /> {newCount} new
+          </span>
+        )}
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          aria-label="Refresh orders"
+          className="ml-auto flex items-center gap-1.5 text-xs text-gray-400 hover:text-white disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
+      </div>
 
       {orders.length === 0 ? (
         <EmptyState message="No orders yet." />
@@ -952,12 +992,21 @@ function OrdersSection({
           {orders.map((order) => {
             const address = formatAddress(order.shippingAddress);
             const isUpdating = updating.has(order._id);
+            const isNew = order.status === "PENDING";
             return (
-              <div key={order._id} className={cardClass}>
+              <div
+                key={order._id}
+                className={`${cardClass} ${isNew ? "border-amber-500/30" : ""}`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white">#{order._id.slice(-8)}</span>
+                      {isNew && (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                          <Sparkles className="w-2.5 h-2.5" /> New
+                        </span>
+                      )}
                       <Link
                         href={`/orders/${order._id}/invoice`}
                         target="_blank"
@@ -1001,10 +1050,10 @@ function OrdersSection({
                     value={order.status}
                     disabled={isUpdating}
                     onChange={(e) => handleChange(order, e.target.value as OrderStatus)}
-                    className={`${inputClass} w-auto disabled:opacity-50`}
+                    className={`rounded-xl border px-4 py-3 text-sm font-medium focus:outline-none focus:border-white/30 transition-colors disabled:opacity-50 ${STATUS_STYLES[order.status]}`}
                   >
                     {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s} className="bg-[#111113]">
+                      <option key={s} value={s} className="bg-[#111113] text-white">
                         {s}
                       </option>
                     ))}
@@ -2293,6 +2342,14 @@ export function AdminDashboard() {
     }
   };
 
+  const handleRefreshOrders = async () => {
+    try {
+      await fetchOrders();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to refresh orders"));
+    }
+  };
+
   /* ---- Banners ---- */
 
   const handleCreateBanner = async (values: BannerFormValues) => {
@@ -2475,7 +2532,9 @@ export function AdminDashboard() {
               onDelete={handleDeleteProduct}
             />
           )}
-          {activeTab === "orders" && <OrdersSection orders={orders} onStatusChange={handleOrderStatusChange} />}
+          {activeTab === "orders" && (
+            <OrdersSection orders={orders} onStatusChange={handleOrderStatusChange} onRefresh={handleRefreshOrders} />
+          )}
           {activeTab === "users" && <UsersSection users={users} />}
           {activeTab === "banners" && (
             <BannersSection
