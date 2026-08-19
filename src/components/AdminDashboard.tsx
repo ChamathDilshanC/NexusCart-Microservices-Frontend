@@ -125,6 +125,9 @@ interface BannerFormValues {
 
 type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
+// How prominent the banner block is on screen — shared by every layout, each
+// mapping the same four steps to its own height/width scale.
+type BannerSize = "small" | "medium" | "large" | "full";
 
 interface BannerTemplateOptions {
   carousel: {
@@ -132,7 +135,6 @@ interface BannerTemplateOptions {
     intervalMs: number;
     showArrows: boolean;
     showDots: boolean;
-    height: "compact" | "standard" | "tall";
   };
   grid: {
     columns: number;
@@ -168,6 +170,7 @@ interface BannerTemplate {
   name: string;
   layout: BannerLayout;
   position: BannerPosition;
+  size: BannerSize;
   isActive: boolean;
   order: number;
   options: BannerTemplateOptions;
@@ -177,13 +180,21 @@ interface BannerTemplateFormValues {
   name: string;
   layout: BannerLayout;
   position: BannerPosition;
+  size: BannerSize;
   isActive: boolean;
   order: number;
   options: BannerTemplateOptions;
 }
 
+const SIZE_OPTIONS: { value: BannerSize; label: string }[] = [
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+  { value: "full", label: "Full screen" },
+];
+
 const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
-  carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true, height: "standard" },
+  carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true },
   grid: { columns: 3, aspectRatio: "landscape", showSubtitle: true },
   spotlight: { maxListItems: 4, showListSubtitle: false },
   sidebar: { autoAdvance: true, intervalMs: 4000 },
@@ -1279,6 +1290,7 @@ function BannerTemplateForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [layout, setLayout] = useState<BannerLayout>(initial?.layout ?? "carousel");
   const [position, setPosition] = useState<BannerPosition>(initial?.position ?? "top");
+  const [size, setSize] = useState<BannerSize>(initial?.size ?? "medium");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [order, setOrder] = useState(initial ? String(initial.order) : "0");
   const [options, setOptions] = useState<BannerTemplateOptions>(initial?.options ?? DEFAULT_TEMPLATE_OPTIONS);
@@ -1309,6 +1321,7 @@ function BannerTemplateForm({
       name: name.trim(),
       layout,
       position: layout === "sidebar" ? "sidebar" : position,
+      size,
       isActive,
       order: Number.parseInt(order, 10) || 0,
       options,
@@ -1346,6 +1359,14 @@ function BannerTemplateForm({
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Size</label>
+        <SegmentedControl value={size} onChange={setSize} options={SIZE_OPTIONS} />
+        <p className="text-xs text-gray-600 mt-1.5">
+          How prominent this banner block is on the shop page — applies no matter which layout you pick above.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1394,30 +1415,16 @@ function BannerTemplateForm({
             />
             <span className="text-sm text-gray-300">Auto-advance</span>
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
-              <ClampedNumberInput
-                min={2}
-                max={10}
-                fallback={5}
-                value={Math.round(options.carousel.intervalMs / 1000)}
-                onCommit={(seconds) => updateCarousel({ intervalMs: seconds * 1000 })}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1.5 block">Height</label>
-              <SegmentedControl
-                value={options.carousel.height}
-                onChange={(v) => updateCarousel({ height: v })}
-                options={[
-                  { value: "compact", label: "Compact" },
-                  { value: "standard", label: "Standard" },
-                  { value: "tall", label: "Tall" },
-                ]}
-              />
-            </div>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+            <ClampedNumberInput
+              min={2}
+              max={10}
+              fallback={5}
+              value={Math.round(options.carousel.intervalMs / 1000)}
+              onCommit={(seconds) => updateCarousel({ intervalMs: seconds * 1000 })}
+              className={inputClass}
+            />
           </div>
           <div className="flex items-center gap-6">
             <label className="flex items-center gap-3 cursor-pointer select-none">
@@ -1716,6 +1723,12 @@ function BannerTemplatesSection({
     bottom: "Bottom of page",
     sidebar: "Page sides (left + right)",
   };
+  const SIZE_LABELS: Record<BannerSize, string> = {
+    small: "Small",
+    medium: "Medium",
+    large: "Large",
+    full: "Full screen",
+  };
 
   return (
     <div className={cardClass}>
@@ -1756,7 +1769,7 @@ function BannerTemplatesSection({
                 </div>
                 <p className="text-xs text-gray-500 mt-1 truncate">
                   {LAYOUT_TEMPLATES.find((l) => l.id === tpl.layout)?.label ?? tpl.layout} ·{" "}
-                  {POSITION_LABELS[tpl.position]} · Order {tpl.order}
+                  {SIZE_LABELS[tpl.size ?? "medium"]} · {POSITION_LABELS[tpl.position]} · Order {tpl.order}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">

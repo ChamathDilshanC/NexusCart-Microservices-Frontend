@@ -53,6 +53,9 @@ function bannerHref(banner: Banner): string | undefined {
 
 type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
+// How prominent the banner block is on screen — shared by every layout, each
+// mapping the same four steps to its own height/width scale below.
+type BannerSize = "small" | "medium" | "large" | "full";
 
 interface BannerTemplateOptions {
   carousel: {
@@ -60,7 +63,6 @@ interface BannerTemplateOptions {
     intervalMs: number;
     showArrows: boolean;
     showDots: boolean;
-    height: "compact" | "standard" | "tall";
   };
   grid: {
     columns: number;
@@ -96,10 +98,24 @@ interface BannerTemplate {
   name: string;
   layout: BannerLayout;
   position: BannerPosition;
+  size?: BannerSize;
   isActive: boolean;
   order: number;
   options: BannerTemplateOptions;
 }
+
+// Every layout maps the same four size steps to whatever "bigger" means for
+// its own shape — a taller carousel, a wider grid, a bigger rail, etc.
+function resolveSize(template: BannerTemplate): BannerSize {
+  return template.size ?? "medium";
+}
+
+const BANNER_CONTAINER_WIDTH: Record<BannerSize, string> = {
+  small: "max-w-7xl",
+  medium: "max-w-[1600px]",
+  large: "max-w-[1920px]",
+  full: "max-w-none",
+};
 
 type SortOption = "price_asc" | "price_desc" | "name_asc" | "newest";
 type Availability = "in_stock" | "out_of_stock";
@@ -692,27 +708,33 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
 /* ---------------------------- Banner block dispatcher ---------------------------- */
 
 function BannerBlock({ template, banners }: { template: BannerTemplate; banners: Banner[] }) {
+  const size = resolveSize(template);
   if (template.layout === "grid") {
-    return <BannerGrid banners={banners} options={template.options.grid} />;
+    return <BannerGrid banners={banners} options={template.options.grid} size={size} />;
   }
   if (template.layout === "spotlight") {
-    return <BannerSpotlight banners={banners} options={template.options.spotlight} />;
+    return <BannerSpotlight banners={banners} options={template.options.spotlight} size={size} />;
   }
   if (template.layout === "showcase") {
-    return <BannerShowcase banners={banners} options={template.options.showcase} />;
+    return <BannerShowcase banners={banners} options={template.options.showcase} size={size} />;
   }
   if (template.layout === "bento") {
-    return <BannerBento banners={banners} options={template.options.bento} />;
+    return <BannerBento banners={banners} options={template.options.bento} size={size} />;
   }
   if (template.layout === "marquee") {
-    return <BannerMarquee banners={banners} options={template.options.marquee} />;
+    return <BannerMarquee banners={banners} options={template.options.marquee} size={size} />;
   }
-  return <BannerCarousel banners={banners} options={template.options.carousel} />;
+  return <BannerCarousel banners={banners} options={template.options.carousel} size={size} />;
 }
 
 /* ---------------------------- Banner showcase ---------------------------- */
 
-const SHOWCASE_HEIGHT = "h-[220px] md:h-[320px]";
+const SHOWCASE_HEIGHT_CLASSES: Record<BannerSize, string> = {
+  small: "h-[160px] md:h-[240px]",
+  medium: "h-[220px] md:h-[320px]",
+  large: "h-[280px] md:h-[400px]",
+  full: "h-[55vh] md:h-[70vh]",
+};
 // Six positions relative to the current step: -1/4 are collapsed buffers just
 // off both edges (so cards fade+grow in and fade+shrink out instead of
 // popping), 0/3 are the small edge cards, 1/2 are the large centered ones.
@@ -734,9 +756,11 @@ const mod = (n: number, m: number) => ((n % m) + m) % m;
 function BannerShowcase({
   banners,
   options,
+  size,
 }: {
   banners: Banner[];
   options: BannerTemplateOptions["showcase"];
+  size: BannerSize;
 }) {
   const sorted = useMemo(() => [...banners].sort((a, b) => a.order - b.order), [banners]);
   const [step, setStep] = useState(0);
@@ -767,8 +791,8 @@ function BannerShowcase({
   const advance = (delta: number) => setStep((s) => s + delta);
 
   return (
-    <div className="relative max-w-[1600px] mx-auto px-6 py-8">
-      <div className={`flex items-stretch gap-3 md:gap-4 overflow-hidden ${SHOWCASE_HEIGHT}`}>
+    <div className={`relative ${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+      <div className={`flex items-stretch gap-3 md:gap-4 overflow-hidden ${SHOWCASE_HEIGHT_CLASSES[size]}`}>
         {slots.map(({ offset, banner }) =>
           banner ? (
             <ShowcaseCard
@@ -853,16 +877,26 @@ function ShowcaseCard({
 
 /* ---------------------------- Sidebar rails ---------------------------- */
 
+const SIDEBAR_WIDTH_CLASSES: Record<BannerSize, string> = {
+  small: "w-40",
+  medium: "w-48",
+  large: "w-56",
+  full: "w-64",
+};
+
 function SidebarRails({ blocks }: { blocks: { tpl: BannerTemplate; tplBanners: Banner[] }[] }) {
   if (blocks.length === 0) return null;
+  // All sidebar templates share one fixed rail, so the first one's size sets
+  // the rail's width (there's normally only one sidebar template active).
+  const width = SIDEBAR_WIDTH_CLASSES[resolveSize(blocks[0].tpl)];
   return (
     <>
-      <div className="hidden 2xl:flex flex-col gap-4 fixed left-6 top-28 z-20 w-48">
+      <div className={`hidden 2xl:flex flex-col gap-4 fixed left-6 top-28 z-20 ${width}`}>
         {blocks.map(({ tpl, tplBanners }) => (
           <SidebarCarousel key={tpl._id} banners={tplBanners} options={tpl.options.sidebar} />
         ))}
       </div>
-      <div className="hidden 2xl:flex flex-col gap-4 fixed right-6 top-28 z-20 w-48">
+      <div className={`hidden 2xl:flex flex-col gap-4 fixed right-6 top-28 z-20 ${width}`}>
         {blocks.map(({ tpl, tplBanners }) => (
           <SidebarCarousel key={tpl._id} banners={tplBanners} options={tpl.options.sidebar} />
         ))}
@@ -922,18 +956,21 @@ function SidebarSlot({ banner }: { banner: Banner }) {
 
 /* ---------------------------- Banner carousel ---------------------------- */
 
-const CAROUSEL_HEIGHT_CLASSES: Record<BannerTemplateOptions["carousel"]["height"], string> = {
-  compact: "h-[200px] md:h-[280px]",
-  standard: "h-[280px] md:h-[380px]",
-  tall: "h-[360px] md:h-[480px]",
+const CAROUSEL_HEIGHT_CLASSES: Record<BannerSize, string> = {
+  small: "h-[200px] md:h-[280px]",
+  medium: "h-[280px] md:h-[380px]",
+  large: "h-[360px] md:h-[480px]",
+  full: "h-[70vh] md:h-[88vh]",
 };
 
 function BannerCarousel({
   banners,
   options,
+  size,
 }: {
   banners: Banner[];
   options: BannerTemplateOptions["carousel"];
+  size: BannerSize;
 }) {
   const [index, setIndex] = useState(0);
 
@@ -953,7 +990,7 @@ function BannerCarousel({
 
   return (
     <div
-      className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[options.height]}`}
+      className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[size]}`}
     >
       {banners.map((b, i) => (
         <BannerSlide key={b._id} banner={b} active={i === index} />
@@ -1039,16 +1076,18 @@ const GRID_COLUMN_CLASSES: Record<number, string> = {
 function BannerGrid({
   banners,
   options,
+  size,
 }: {
   banners: Banner[];
   options: BannerTemplateOptions["grid"];
+  size: BannerSize;
 }) {
   const sorted = [...banners].sort((a, b) => a.order - b.order);
   const columnClass = GRID_COLUMN_CLASSES[options.columns] ?? GRID_COLUMN_CLASSES[3];
   const aspectClass = options.aspectRatio === "square" ? "aspect-square" : "aspect-video";
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
       <div className={`grid grid-cols-1 ${columnClass} gap-4`}>
         {sorted.map((banner) => {
           const card = (
@@ -1084,19 +1123,28 @@ function BannerGrid({
 
 /* ---------------------------- Banner spotlight ---------------------------- */
 
+const SPOTLIGHT_HEIGHT_CLASSES: Record<BannerSize, string> = {
+  small: "h-[200px] md:h-[300px]",
+  medium: "h-[280px] md:h-[420px]",
+  large: "h-[340px] md:h-[500px]",
+  full: "h-[60vh] md:h-[75vh]",
+};
+
 function BannerSpotlight({
   banners,
   options,
+  size,
 }: {
   banners: Banner[];
   options: BannerTemplateOptions["spotlight"];
+  size: BannerSize;
 }) {
   const sorted = [...banners].sort((a, b) => a.order - b.order);
   const featured = sorted[0];
   const rest = sorted.slice(1, 1 + options.maxListItems);
 
   const featuredCard = (
-    <div className="relative w-full h-[280px] md:h-[420px] overflow-hidden rounded-2xl bg-[#111113]">
+    <div className={`relative w-full ${SPOTLIGHT_HEIGHT_CLASSES[size]} overflow-hidden rounded-2xl bg-[#111113]`}>
       <img src={featured.imageUrl} alt={featured.title} className="w-full h-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 p-6">
@@ -1109,7 +1157,7 @@ function BannerSpotlight({
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="lg:w-2/3">
           {bannerHref(featured) ? (
@@ -1155,20 +1203,29 @@ function BannerSpotlight({
 
 /* ------------------------------- Banner bento ------------------------------- */
 
+const BENTO_ROW_CLASSES: Record<BannerSize, string> = {
+  small: "auto-rows-[100px] md:auto-rows-[115px]",
+  medium: "auto-rows-[130px] md:auto-rows-[150px]",
+  large: "auto-rows-[160px] md:auto-rows-[190px]",
+  full: "auto-rows-[200px] md:auto-rows-[240px]",
+};
+
 function BannerBento({
   banners,
   options,
+  size,
 }: {
   banners: Banner[];
   options: BannerTemplateOptions["bento"];
+  size: BannerSize;
 }) {
   const sorted = [...banners].sort((a, b) => a.order - b.order);
   if (sorted.length === 0) return null;
   const featuredCount = Math.min(options.featuredCount, sorted.length);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="grid grid-cols-2 md:grid-cols-4 auto-rows-[130px] md:auto-rows-[150px] gap-4">
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+      <div className={`grid grid-cols-2 md:grid-cols-4 ${BENTO_ROW_CLASSES[size]} gap-4`}>
         {sorted.map((banner, i) => {
           const isFeatured = i < featuredCount;
           const isWide = !isFeatured && i === featuredCount;
@@ -1246,12 +1303,21 @@ const MARQUEE_DURATIONS: Record<BannerTemplateOptions["marquee"]["speed"], strin
   fast: "16s",
 };
 
+const MARQUEE_CARD_CLASSES: Record<BannerSize, string> = {
+  small: "h-32 md:h-44 w-56 md:w-72",
+  medium: "h-40 md:h-56 w-72 md:w-96",
+  large: "h-48 md:h-64 w-80 md:w-[420px]",
+  full: "h-56 md:h-72 w-96 md:w-[480px]",
+};
+
 function BannerMarquee({
   banners,
   options,
+  size,
 }: {
   banners: Banner[];
   options: BannerTemplateOptions["marquee"];
+  size: BannerSize;
 }) {
   const sorted = [...banners].sort((a, b) => a.order - b.order);
   if (sorted.length === 0) return null;
@@ -1270,7 +1336,7 @@ function BannerMarquee({
           style={{ animation }}
         >
           {items.map((banner, i) => (
-            <MarqueeCard key={`${banner._id}-${i}`} banner={banner} />
+            <MarqueeCard key={`${banner._id}-${i}`} banner={banner} sizeClass={MARQUEE_CARD_CLASSES[size]} />
           ))}
         </div>
       </div>
@@ -1278,10 +1344,10 @@ function BannerMarquee({
   );
 }
 
-function MarqueeCard({ banner }: { banner: Banner }) {
+function MarqueeCard({ banner, sizeClass }: { banner: Banner; sizeClass: string }) {
   const href = bannerHref(banner);
   const content = (
-    <div className="group relative h-40 md:h-56 w-72 md:w-96 shrink-0 overflow-hidden rounded-2xl bg-[#111113] border border-white/10">
+    <div className={`group relative ${sizeClass} shrink-0 overflow-hidden rounded-2xl bg-[#111113] border border-white/10`}>
       <img
         src={banner.imageUrl}
         alt={banner.title}
