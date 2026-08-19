@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 
 /* ---------------------------------- Types ---------------------------------- */
 
@@ -252,10 +253,6 @@ const TABS: { id: TabId; label: string; icon: IconType }[] = [
 ];
 
 /* ---------------------------------- Helpers ---------------------------------- */
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
-}
 
 function formatDate(iso: string): string {
   try {
@@ -803,6 +800,7 @@ function ProductsSection({
   const [editing, setEditing] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
+  const { formatPrice } = useCurrency();
 
   const openCreate = () => {
     setEditing(null);
@@ -894,11 +892,11 @@ function ProductsSection({
                 <div className="text-sm font-medium text-white shrink-0">
                   {onSale ? (
                     <span className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 line-through">{formatCurrency(product.price)}</span>
-                      <span className="text-emerald-300">{formatCurrency(product.effectivePrice ?? product.price)}</span>
+                      <span className="text-xs text-gray-500 line-through">{formatPrice(product.price)}</span>
+                      <span className="text-emerald-300">{formatPrice(product.effectivePrice ?? product.price)}</span>
                     </span>
                   ) : (
-                    formatCurrency(product.price)
+                    formatPrice(product.price)
                   )}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -951,6 +949,7 @@ function OrdersSection({
 }) {
   const [updating, setUpdating] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const { formatPrice } = useCurrency();
 
   const handleChange = async (order: Order, status: OrderStatus) => {
     setUpdating((prev) => new Set(prev).add(order._id));
@@ -1031,7 +1030,7 @@ function OrdersSection({
                     <div className="text-xs text-gray-500 mt-1">{formatDate(order.createdAt)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium text-white">{formatCurrency(order.totalAmount)}</div>
+                    <div className="text-sm font-medium text-white">{formatPrice(order.totalAmount)}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {order.items.length} item{order.items.length !== 1 ? "s" : ""}
                     </div>
@@ -1045,11 +1044,11 @@ function OrdersSection({
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-white truncate">{item.name}</div>
                         <div className="text-xs text-gray-500">
-                          {item.quantity} × {formatCurrency(item.price)}
+                          {item.quantity} × {formatPrice(item.price)}
                         </div>
                       </div>
                       <div className="text-sm text-gray-300 shrink-0">
-                        {formatCurrency(item.quantity * item.price)}
+                        {formatPrice(item.quantity * item.price)}
                       </div>
                     </div>
                   ))}
@@ -1953,8 +1952,11 @@ function describeScope(promo: { scope: PromotionScope; category?: string; produc
   return `${promo.productIds.length} product${promo.productIds.length !== 1 ? "s" : ""}`;
 }
 
-function describeDiscount(promo: { discountType: DiscountType; discountValue: number }) {
-  return promo.discountType === "percentage" ? `${promo.discountValue}% off` : `${formatCurrency(promo.discountValue)} off`;
+function describeDiscount(
+  promo: { discountType: DiscountType; discountValue: number },
+  formatPrice: (amount: number) => string
+) {
+  return promo.discountType === "percentage" ? `${promo.discountValue}% off` : `${formatPrice(promo.discountValue)} off`;
 }
 
 function PromotionForm({
@@ -2140,6 +2142,7 @@ function PromotionsSection({
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Promotion | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { formatPrice } = useCurrency();
 
   const openCreate = () => {
     setEditing(null);
@@ -2202,7 +2205,7 @@ function PromotionsSection({
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1 truncate">
-                  {describeDiscount(promo)} · {describeScope(promo)}
+                  {describeDiscount(promo, formatPrice)} · {describeScope(promo)}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -2324,6 +2327,7 @@ function SettingsSection({
 
 export function AdminDashboard() {
   const toast = useToast();
+  const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("products");
 
@@ -2605,7 +2609,7 @@ export function AdminDashboard() {
             />
             <StatCard
               label="Revenue"
-              value={metrics ? formatCurrency(metrics.totalRevenue) : "—"}
+              value={metrics ? formatPrice(metrics.totalRevenue) : "—"}
               icon={DollarSign}
             />
           </div>
