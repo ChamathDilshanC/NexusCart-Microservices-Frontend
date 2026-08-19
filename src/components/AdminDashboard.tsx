@@ -122,7 +122,7 @@ interface BannerFormValues {
   templateIds: string[];
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 
 interface BannerTemplateOptions {
@@ -151,6 +151,15 @@ interface BannerTemplateOptions {
     intervalMs: number;
     showArrows: boolean;
   };
+  bento: {
+    featuredCount: number;
+    showSubtitle: boolean;
+  };
+  marquee: {
+    speed: "slow" | "normal" | "fast";
+    direction: "left" | "right";
+    pauseOnHover: boolean;
+  };
 }
 
 interface BannerTemplate {
@@ -178,6 +187,8 @@ const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
   spotlight: { maxListItems: 4, showListSubtitle: false },
   sidebar: { autoAdvance: true, intervalMs: 4000 },
   showcase: { autoAdvance: true, intervalMs: 5000, showArrows: true },
+  bento: { featuredCount: 1, showSubtitle: true },
+  marquee: { speed: "normal", direction: "left", pauseOnHover: true },
 };
 
 type DiscountType = "percentage" | "fixed";
@@ -309,10 +320,12 @@ function Modal({
   title,
   onClose,
   children,
+  widthClass = "max-w-2xl",
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  widthClass?: string;
 }) {
   return (
     <div
@@ -320,7 +333,7 @@ function Modal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#111113] border border-white/10 rounded-2xl p-6 my-auto"
+        className={`w-full ${widthClass} bg-[#111113] border border-white/10 rounded-2xl p-6 my-auto`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
@@ -1115,6 +1128,8 @@ const LAYOUT_TEMPLATES: { id: BannerLayout; label: string; description: string }
   { id: "spotlight", label: "Spotlight", description: "One featured banner with a list of others beside it." },
   { id: "sidebar", label: "Sidebar", description: "Small auto-rotating banners fixed to the page's left and right margins." },
   { id: "showcase", label: "Showcase", description: "A row with two large banners in the center and smaller ones peeking at each side." },
+  { id: "bento", label: "Bento", description: "Modern asymmetric grid — one or two large featured tiles with smaller ones filling in around them." },
+  { id: "marquee", label: "Marquee", description: "All banners in one continuous, auto-scrolling strip." },
 ];
 
 function LayoutPreview({ layout }: { layout: BannerLayout }) {
@@ -1156,6 +1171,24 @@ function LayoutPreview({ layout }: { layout: BannerLayout }) {
         <div className="flex-1 h-full rounded-md bg-white/20" />
         <div className="flex-1 h-full rounded-md bg-white/20" />
         <div className="w-3 h-8 rounded-md bg-white/20" />
+      </div>
+    );
+  }
+  if (layout === "bento") {
+    return (
+      <div className="grid grid-cols-3 grid-rows-2 gap-1 h-12 w-full">
+        <div className="col-span-2 row-span-2 rounded-md bg-white/20" />
+        <div className="rounded-md bg-white/20" />
+        <div className="rounded-md bg-white/20" />
+      </div>
+    );
+  }
+  if (layout === "marquee") {
+    return (
+      <div className="flex items-center gap-1 h-12 w-full overflow-hidden">
+        <div className="w-10 h-8 rounded-md bg-white/20 shrink-0" />
+        <div className="w-10 h-8 rounded-md bg-white/20 shrink-0" />
+        <div className="w-10 h-8 rounded-md bg-white/10 shrink-0" />
       </div>
     );
   }
@@ -1262,6 +1295,10 @@ function BannerTemplateForm({
     setOptions((prev) => ({ ...prev, sidebar: { ...prev.sidebar, ...patch } }));
   const updateShowcase = (patch: Partial<BannerTemplateOptions["showcase"]>) =>
     setOptions((prev) => ({ ...prev, showcase: { ...prev.showcase, ...patch } }));
+  const updateBento = (patch: Partial<BannerTemplateOptions["bento"]>) =>
+    setOptions((prev) => ({ ...prev, bento: { ...prev.bento, ...patch } }));
+  const updateMarquee = (patch: Partial<BannerTemplateOptions["marquee"]>) =>
+    setOptions((prev) => ({ ...prev, marquee: { ...prev.marquee, ...patch } }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1294,7 +1331,7 @@ function BannerTemplateForm({
 
       <div>
         <label className="text-xs text-gray-500 mb-1.5 block">Layout</label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {LAYOUT_TEMPLATES.map((tpl) => (
             <button
               type="button"
@@ -1539,6 +1576,77 @@ function BannerTemplateForm({
         </div>
       )}
 
+      {layout === "bento" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            The first banners (by order) become the large featured tiles; the rest fill in as smaller
+            cells around them.
+          </p>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Featured tiles</label>
+            <SegmentedControl
+              value={options.bento.featuredCount}
+              onChange={(v) => updateBento({ featuredCount: v })}
+              options={[
+                { value: 1, label: "1 large" },
+                { value: 2, label: "2 large" },
+              ]}
+            />
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.bento.showSubtitle}
+              onChange={(e) => updateBento({ showSubtitle: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Show subtitle on featured tiles</span>
+          </label>
+        </div>
+      )}
+
+      {layout === "marquee" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Every tagged banner scrolls past in one continuous, looping strip.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Speed</label>
+              <SegmentedControl
+                value={options.marquee.speed}
+                onChange={(v) => updateMarquee({ speed: v })}
+                options={[
+                  { value: "slow", label: "Slow" },
+                  { value: "normal", label: "Normal" },
+                  { value: "fast", label: "Fast" },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Direction</label>
+              <SegmentedControl
+                value={options.marquee.direction}
+                onChange={(v) => updateMarquee({ direction: v })}
+                options={[
+                  { value: "left", label: "Left" },
+                  { value: "right", label: "Right" },
+                ]}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.marquee.pauseOnHover}
+              onChange={(e) => updateMarquee({ pauseOnHover: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Pause on hover</span>
+          </label>
+        </div>
+      )}
+
       <label className="flex items-center gap-3 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -1674,7 +1782,7 @@ function BannerTemplatesSection({
       )}
 
       {showForm && (
-        <Modal title={editing ? "Edit template" : "Add template"} onClose={closeForm}>
+        <Modal title={editing ? "Edit template" : "Add template"} onClose={closeForm} widthClass="max-w-4xl">
           <BannerTemplateForm initial={editing} submitting={submitting} onCancel={closeForm} onSubmit={handleSubmit} />
         </Modal>
       )}

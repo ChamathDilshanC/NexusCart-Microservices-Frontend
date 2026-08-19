@@ -51,7 +51,7 @@ function bannerHref(banner: Banner): string | undefined {
   return banner.productId ? `/product/${banner.productId}` : banner.linkUrl || undefined;
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 
 interface BannerTemplateOptions {
@@ -79,6 +79,15 @@ interface BannerTemplateOptions {
     autoAdvance: boolean;
     intervalMs: number;
     showArrows: boolean;
+  };
+  bento: {
+    featuredCount: number;
+    showSubtitle: boolean;
+  };
+  marquee: {
+    speed: "slow" | "normal" | "fast";
+    direction: "left" | "right";
+    pauseOnHover: boolean;
   };
 }
 
@@ -692,6 +701,12 @@ function BannerBlock({ template, banners }: { template: BannerTemplate; banners:
   if (template.layout === "showcase") {
     return <BannerShowcase banners={banners} options={template.options.showcase} />;
   }
+  if (template.layout === "bento") {
+    return <BannerBento banners={banners} options={template.options.bento} />;
+  }
+  if (template.layout === "marquee") {
+    return <BannerMarquee banners={banners} options={template.options.marquee} />;
+  }
   return <BannerCarousel banners={banners} options={template.options.carousel} />;
 }
 
@@ -752,7 +767,7 @@ function BannerShowcase({
   const advance = (delta: number) => setStep((s) => s + delta);
 
   return (
-    <div className="relative max-w-7xl mx-auto px-6 py-8">
+    <div className="relative max-w-[1600px] mx-auto px-6 py-8">
       <div className={`flex items-stretch gap-3 md:gap-4 overflow-hidden ${SHOWCASE_HEIGHT}`}>
         {slots.map(({ offset, banner }) =>
           banner ? (
@@ -1136,6 +1151,152 @@ function BannerSpotlight({
       </div>
     </div>
   );
+}
+
+/* ------------------------------- Banner bento ------------------------------- */
+
+function BannerBento({
+  banners,
+  options,
+}: {
+  banners: Banner[];
+  options: BannerTemplateOptions["bento"];
+}) {
+  const sorted = [...banners].sort((a, b) => a.order - b.order);
+  if (sorted.length === 0) return null;
+  const featuredCount = Math.min(options.featuredCount, sorted.length);
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 auto-rows-[130px] md:auto-rows-[150px] gap-4">
+        {sorted.map((banner, i) => {
+          const isFeatured = i < featuredCount;
+          const isWide = !isFeatured && i === featuredCount;
+          const spanClass = isFeatured
+            ? "col-span-2 row-span-2"
+            : isWide
+            ? "col-span-2 row-span-1"
+            : "col-span-1 row-span-1";
+          return (
+            <BentoCard
+              key={banner._id}
+              banner={banner}
+              large={isFeatured}
+              showSubtitle={isFeatured && options.showSubtitle}
+              className={spanClass}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BentoCard({
+  banner,
+  large,
+  showSubtitle,
+  className,
+}: {
+  banner: Banner;
+  large: boolean;
+  showSubtitle: boolean;
+  className: string;
+}) {
+  const href = bannerHref(banner);
+  const content = (
+    <div className="group relative h-full w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/10">
+      <img
+        src={banner.imageUrl}
+        alt={banner.title}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4">
+        <h3
+          className={`font-semibold text-white tracking-tight leading-tight line-clamp-2 ${
+            large ? "text-base md:text-xl" : "text-xs md:text-sm"
+          }`}
+        >
+          {banner.title}
+        </h3>
+        {showSubtitle && banner.subtitle && (
+          <p className="hidden md:block text-sm text-gray-300 mt-1.5 max-w-md line-clamp-2">
+            {banner.subtitle}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  return href ? (
+    <a href={href} className={className}>
+      {content}
+    </a>
+  ) : (
+    <div className={className}>{content}</div>
+  );
+}
+
+/* ------------------------------ Banner marquee ------------------------------ */
+
+const MARQUEE_DURATIONS: Record<BannerTemplateOptions["marquee"]["speed"], string> = {
+  slow: "45s",
+  normal: "28s",
+  fast: "16s",
+};
+
+function BannerMarquee({
+  banners,
+  options,
+}: {
+  banners: Banner[];
+  options: BannerTemplateOptions["marquee"];
+}) {
+  const sorted = [...banners].sort((a, b) => a.order - b.order);
+  if (sorted.length === 0) return null;
+  // Four copies of the full set, shifted left by exactly one copy's width
+  // (25%), makes the loop seamless regardless of how many banners there are.
+  const items = Array(4).fill(sorted).flat();
+  const animation = `marquee ${MARQUEE_DURATIONS[options.speed]} linear infinite${
+    options.direction === "right" ? " reverse" : ""
+  }`;
+
+  return (
+    <div className="py-8">
+      <div className="w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
+        <div
+          className={`flex w-max gap-4 px-2 ${options.pauseOnHover ? "hover:[animation-play-state:paused]" : ""}`}
+          style={{ animation }}
+        >
+          {items.map((banner, i) => (
+            <MarqueeCard key={`${banner._id}-${i}`} banner={banner} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MarqueeCard({ banner }: { banner: Banner }) {
+  const href = bannerHref(banner);
+  const content = (
+    <div className="group relative h-40 md:h-56 w-72 md:w-96 shrink-0 overflow-hidden rounded-2xl bg-[#111113] border border-white/10">
+      <img
+        src={banner.imageUrl}
+        alt={banner.title}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4">
+        <h3 className="text-sm md:text-base font-semibold text-white tracking-tight leading-tight line-clamp-2">
+          {banner.title}
+        </h3>
+      </div>
+    </div>
+  );
+
+  return href ? <a href={href}>{content}</a> : content;
 }
 
 /* ------------------------------ Product card ------------------------------ */
