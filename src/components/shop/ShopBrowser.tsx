@@ -1145,9 +1145,9 @@ function ProductCard({ product }: { product: Product }) {
       <div className="flex flex-col gap-1 p-4 flex-1">
         <span className="text-xs text-gray-500">{product.category}</span>
         <h3 className="text-sm font-medium text-white line-clamp-2">{product.name}</h3>
-        <div className="mt-auto flex items-center justify-between pt-2">
+        <div className="mt-auto flex items-end justify-between pt-2">
           {onSale ? (
-            <span className="flex items-center gap-2">
+            <span className="flex flex-col">
               <span className="text-sm font-semibold text-emerald-400">{formatPrice(displayPrice)}</span>
               <span className="text-xs text-gray-500 line-through">{formatPrice(product.price)}</span>
             </span>
