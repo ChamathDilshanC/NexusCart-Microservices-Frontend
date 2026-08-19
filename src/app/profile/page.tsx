@@ -138,26 +138,49 @@ export default function ProfilePage() {
     }
   }, [isAuthInitialized, currentUser, router]);
 
-  // Load order history once we have a confirmed session.
+  // Load order history once we have a confirmed session, then keep it live
+  // by polling in the background — so a status an admin changes elsewhere
+  // (or a payment that just went through) shows up here without a manual
+  // refresh. Polling pauses while the tab isn't visible.
+  const ORDERS_POLL_MS = 8000;
+
   useEffect(() => {
     if (!isAuthInitialized || !currentUser) return;
     let cancelled = false;
-    setOrdersLoading(true);
-    apiFetch<Order[]>("/orders/my-orders")
-      .then((data) => {
-        if (!cancelled) setOrders(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setOrders([]);
-          toast.error(err instanceof ApiError ? err.message : "Failed to load your orders.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setOrdersLoading(false);
-      });
+
+    const fetchOrders = (showSpinner: boolean) => {
+      if (showSpinner) setOrdersLoading(true);
+      apiFetch<Order[]>("/orders/my-orders")
+        .then((data) => {
+          if (!cancelled) setOrders(data);
+        })
+        .catch((err) => {
+          if (!cancelled && showSpinner) {
+            setOrders([]);
+            toast.error(err instanceof ApiError ? err.message : "Failed to load your orders.");
+          }
+          // Background polls fail silently — a transient network hiccup
+          // shouldn't spam the user with repeat error toasts.
+        })
+        .finally(() => {
+          if (!cancelled && showSpinner) setOrdersLoading(false);
+        });
+    };
+
+    fetchOrders(true);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchOrders(false);
+    }, ORDERS_POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchOrders(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthInitialized, currentUser?.id]);
