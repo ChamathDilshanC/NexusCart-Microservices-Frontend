@@ -31,7 +31,7 @@ graph TD
     Gateway --> Prod[Product Service]
     end
     
-    Auth -.-> DB[(Cosmos DB)]
+    Auth -.-> DB[(Oracle Autonomous JSON DB)]
     Biz -.-> DB
     Prod -.-> DB
 
