@@ -163,10 +163,9 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = () => {
     if (!product || product.stock <= 0) return;
-    const gallery = product.images && product.images.length > 0 ? product.images : product.imageUrl ? [product.imageUrl] : [];
     const onSale = !!product.discountPercent && product.discountPercent > 0;
     const price = onSale ? product.effectivePrice ?? product.price : product.price;
-    addItem({ productId: product._id, name: product.name, price, imageUrl: gallery[0] }, quantity);
+    addItem({ productId: product._id, name: product.name, price, imageUrl: product.imageUrl || product.images?.[0] }, quantity);
     toast.success(`${product.name} added to cart`);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -242,7 +241,7 @@ export default function ProductDetailPage() {
     );
   }
 
-  const gallery = product.images && product.images.length > 0 ? product.images : product.imageUrl ? [product.imageUrl] : [];
+  const gallery = [product.imageUrl, ...(product.images || [])].filter((src): src is string => Boolean(src));
   const mainImage = gallery[activeImage];
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
   const roundedRating = Math.round(avgRating);
