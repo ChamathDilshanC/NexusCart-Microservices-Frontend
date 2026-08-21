@@ -104,18 +104,72 @@ interface BannerTemplate {
   options: BannerTemplateOptions;
 }
 
-type ProductTemplatePosition = "top" | "above-grid" | "bottom";
+type ProductTemplateLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
+type ProductTemplatePosition = "top" | "above-grid" | "bottom" | "sidebar";
+type ProductTemplateSize = "small" | "medium" | "large" | "full";
+
+interface ProductTemplateOptions {
+  carousel: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
+    showDots: boolean;
+  };
+  grid: {
+    columns: number;
+    rows: number;
+    autoAdvance: boolean;
+    intervalMs: number;
+  };
+  spotlight: {
+    maxListItems: number;
+  };
+  sidebar: {
+    autoAdvance: boolean;
+    intervalMs: number;
+  };
+  showcase: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
+  };
+  bento: {
+    featuredCount: number;
+  };
+  marquee: {
+    speed: "slow" | "normal" | "fast";
+    direction: "left" | "right";
+    pauseOnHover: boolean;
+  };
+}
 
 interface ProductTemplate {
   _id: string;
   name: string;
+  layout: ProductTemplateLayout;
   position: ProductTemplatePosition;
-  autoAdvance: boolean;
-  intervalMs: number;
+  size: ProductTemplateSize;
   isActive: boolean;
   order: number;
   applyToAllProducts: boolean;
+  options: ProductTemplateOptions;
 }
+
+function productHref(product: Product): string {
+  return `/product/${product._id}`;
+}
+
+function resolveProductSize(template: ProductTemplate): ProductTemplateSize {
+  return template.size ?? "medium";
+}
+
+// Banner templates and product templates can share a position slot (the
+// three wide ones, and now the sidebar rail too) and both use `order` to
+// sequence themselves within it, so they interleave by that shared order
+// rather than one kind always rendering first.
+type PositionBlock =
+  | { kind: "banner"; order: number; tpl: BannerTemplate; tplBanners: Banner[] }
+  | { kind: "productTemplate"; order: number; tpl: ProductTemplate; tplProducts: Product[] };
 
 // Every layout maps the same four size steps to whatever "bigger" means for
 // its own shape — a taller carousel, a wider grid, a bigger rail, etc.
@@ -430,10 +484,6 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
       })
       .filter((b): b is { tpl: ProductTemplate; tplProducts: Product[] } => b !== null);
 
-  type PositionBlock =
-    | { kind: "banner"; order: number; tpl: BannerTemplate; tplBanners: Banner[] }
-    | { kind: "productTemplate"; order: number; tpl: ProductTemplate; tplProducts: Product[] };
-
   // Banner templates and product templates share the same position slots and
   // both use `order` to sequence themselves within a slot, so they interleave
   // by that shared order rather than banners always rendering first — e.g. a
@@ -467,7 +517,21 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   const topSection = renderTemplateGroup("top");
   const aboveGridSection = renderTemplateGroup("above-grid");
   const bottomSection = renderTemplateGroup("bottom");
-  const sidebarBlocks = getBannerBlocksForPosition("sidebar");
+
+  const sidebarBlocks: PositionBlock[] = useMemo(() => {
+    const bannerBlocks: PositionBlock[] = getBannerBlocksForPosition("sidebar").map((b) => ({
+      kind: "banner",
+      order: b.tpl.order,
+      ...b,
+    }));
+    const productBlocks: PositionBlock[] = getProductTemplateBlocksForPosition("sidebar").map((b) => ({
+      kind: "productTemplate",
+      order: b.tpl.order,
+      ...b,
+    }));
+    return [...bannerBlocks, ...productBlocks].sort((a, b) => a.order - b.order);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bannerTemplates, banners, productTemplates, templatedProducts]);
 
   const onSaleProducts = useMemo(
     () => products.filter((p) => p.discountPercent && p.discountPercent > 0).slice(0, 8),
@@ -828,11 +892,43 @@ function chunkIntoPages<T>(items: T[], size: number): T[][] {
   return pages;
 }
 
-// A fixed 2-row grid of tagged products that auto-slides to the next set on
-// an admin-configured interval — the product-catalog counterpart to
-// BannerCarousel, but paging whole grids instead of cross-fading single slides.
 function ProductTemplateBlock({ template, products }: { template: ProductTemplate; products: Product[] }) {
-  const pages = useMemo(() => chunkIntoPages(products, SECTION_SIZE), [products]);
+  const size = resolveProductSize(template);
+  if (template.layout === "carousel") {
+    return <ProductCarousel products={products} options={template.options.carousel} size={size} />;
+  }
+  if (template.layout === "spotlight") {
+    return <ProductSpotlight products={products} options={template.options.spotlight} size={size} />;
+  }
+  if (template.layout === "showcase") {
+    return <ProductShowcase products={products} options={template.options.showcase} size={size} />;
+  }
+  if (template.layout === "bento") {
+    return <ProductBento products={products} options={template.options.bento} size={size} />;
+  }
+  if (template.layout === "marquee") {
+    return <ProductMarquee products={products} options={template.options.marquee} size={size} />;
+  }
+  return <ProductGrid products={products} options={template.options.grid} size={size} />;
+}
+
+// Unlike BannerGrid (always static — banner pools are small), a product grid
+// can hold far more tagged products, so auto-advance pages through sets of
+// `columns * rows` instead of always rendering everything at once.
+function ProductGrid({
+  products,
+  options,
+  size,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["grid"];
+  size: ProductTemplateSize;
+}) {
+  const pageSize = options.columns * options.rows;
+  const pages = useMemo(
+    () => (options.autoAdvance ? chunkIntoPages(products, pageSize) : [products]),
+    [products, options.autoAdvance, pageSize]
+  );
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -840,30 +936,44 @@ function ProductTemplateBlock({ template, products }: { template: ProductTemplat
   }, [pages.length]);
 
   useEffect(() => {
-    if (!template.autoAdvance) return;
+    if (!options.autoAdvance) return;
     if (pages.length <= 1) return;
-    const id = setInterval(() => setPage((p) => (p + 1) % pages.length), template.intervalMs);
+    const id = setInterval(() => setPage((p) => (p + 1) % pages.length), options.intervalMs);
     return () => clearInterval(id);
-  }, [pages.length, template.autoAdvance, template.intervalMs]);
+  }, [pages.length, options.autoAdvance, options.intervalMs]);
 
-  if (pages.length === 0) return null;
+  if (products.length === 0) return null;
+
+  const columnClass = GRID_COLUMN_CLASSES[options.columns] ?? GRID_COLUMN_CLASSES[3];
 
   return (
-    <div className="max-w-[1600px] mx-auto px-6 py-8">
-      <div className="overflow-hidden">
-        <div
-          className="flex transition-transform duration-500 ease-in-out"
-          style={{ transform: `translateX(-${page * 100}%)` }}
-        >
-          {pages.map((pageProducts, i) => (
-            <div key={i} className="shrink-0 w-full grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {pageProducts.map((p) => (
-                <ProductCard key={p._id} product={p} />
-              ))}
-            </div>
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+      {options.autoAdvance ? (
+        <div className="overflow-hidden">
+          {/* items-start keeps each page sized to its own content — without it,
+              flex's default cross-axis stretch matches every page (including
+              off-screen ones with more rows) to the tallest one, leaving a
+              huge gap under shorter pages' cards. */}
+          <div
+            className="flex items-start transition-transform duration-500 ease-in-out"
+            style={{ transform: `translateX(-${page * 100}%)` }}
+          >
+            {pages.map((pageProducts, i) => (
+              <div key={i} className={`shrink-0 w-full grid grid-cols-1 ${columnClass} gap-4`}>
+                {pageProducts.map((p) => (
+                  <ProductCard key={p._id} product={p} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className={`grid grid-cols-1 ${columnClass} gap-4`}>
+          {products.map((p) => (
+            <ProductCard key={p._id} product={p} />
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1016,6 +1126,112 @@ function ShowcaseCard({
   );
 }
 
+function ProductShowcase({
+  products,
+  options,
+  size,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["showcase"];
+  size: ProductTemplateSize;
+}) {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    if (!options.autoAdvance || products.length <= 1) return;
+    const id = setInterval(() => setStep((s) => s + 1), options.intervalMs);
+    return () => clearInterval(id);
+  }, [products.length, options.autoAdvance, options.intervalMs]);
+
+  if (products.length === 0) return null;
+
+  const used = new Set<number>();
+  const offsetToProduct = new Map<number, Product>();
+  for (const offset of [1, 2, 0, 3, -1, 4]) {
+    const idx = mod(step - offset, products.length);
+    if (used.has(idx)) continue;
+    used.add(idx);
+    offsetToProduct.set(offset, products[idx]);
+  }
+  const slots = SHOWCASE_OFFSETS.map((offset) => ({ offset, product: offsetToProduct.get(offset) ?? null }));
+
+  const advance = (delta: number) => setStep((s) => s + delta);
+
+  return (
+    <div className={`relative ${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+      <div className={`flex items-stretch gap-3 md:gap-4 overflow-hidden ${SHOWCASE_HEIGHT_CLASSES[size]}`}>
+        {slots.map(({ offset, product }) =>
+          product ? (
+            <ProductShowcaseCard
+              key={product._id}
+              product={product}
+              large={offset === 1 || offset === 2}
+              style={showcaseCardStyle(offset)}
+            />
+          ) : (
+            <div key={`empty-${offset}`} style={{ flexGrow: 0, flexBasis: 0 }} />
+          )
+        )}
+      </div>
+
+      {options.showArrows && products.length > 1 && (
+        <>
+          <button
+            onClick={() => advance(-1)}
+            aria-label="Previous"
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => advance(1)}
+            aria-label="Next"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ProductShowcaseCard({
+  product,
+  large,
+  style,
+}: {
+  product: Product;
+  large: boolean;
+  style: React.CSSProperties;
+}) {
+  const { formatPrice } = useCurrency();
+  const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
+
+  return (
+    <a href={productHref(product)} className="group relative block h-full w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/10" style={style}>
+      <ProductImage
+        src={imgSrc}
+        alt={product.name}
+        className="w-full h-full group-hover:scale-105 transition-transform duration-300"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3 md:p-5">
+        <h3
+          className={`font-semibold text-white tracking-tight leading-tight line-clamp-2 ${
+            large ? "text-base md:text-2xl" : "text-xs md:text-sm"
+          }`}
+        >
+          {product.name}
+        </h3>
+        {large && <p className="hidden md:block text-sm text-gray-300 mt-1.5">{formatPrice(displayPrice)}</p>}
+      </div>
+    </a>
+  );
+}
+
 /* ---------------------------- Sidebar rails ---------------------------- */
 
 const SIDEBAR_WIDTH_CLASSES: Record<BannerSize, string> = {
@@ -1025,23 +1241,34 @@ const SIDEBAR_WIDTH_CLASSES: Record<BannerSize, string> = {
   full: "w-64",
 };
 
-function SidebarRails({ blocks }: { blocks: { tpl: BannerTemplate; tplBanners: Banner[] }[] }) {
+function SidebarRails({ blocks }: { blocks: PositionBlock[] }) {
   if (blocks.length === 0) return null;
-  // All sidebar templates share one fixed rail, so the first one's size sets
-  // the rail's width (there's normally only one sidebar template active).
-  const width = SIDEBAR_WIDTH_CLASSES[resolveSize(blocks[0].tpl)];
+  // All sidebar templates (banner or product) share one fixed rail, so the
+  // first block's size sets the rail's width — there's normally only one
+  // sidebar template active at a time.
+  const first = blocks[0];
+  const width = SIDEBAR_WIDTH_CLASSES[first.kind === "banner" ? resolveSize(first.tpl) : resolveProductSize(first.tpl)];
+
+  const rail = (
+    <>
+      {blocks.map((block) =>
+        block.kind === "banner" ? (
+          <SidebarCarousel key={`banner-${block.tpl._id}`} banners={block.tplBanners} options={block.tpl.options.sidebar} />
+        ) : (
+          <ProductSidebarCarousel
+            key={`product-${block.tpl._id}`}
+            products={block.tplProducts}
+            options={block.tpl.options.sidebar}
+          />
+        )
+      )}
+    </>
+  );
+
   return (
     <>
-      <div className={`hidden 2xl:flex flex-col gap-4 fixed left-6 top-28 z-20 ${width}`}>
-        {blocks.map(({ tpl, tplBanners }) => (
-          <SidebarCarousel key={tpl._id} banners={tplBanners} options={tpl.options.sidebar} />
-        ))}
-      </div>
-      <div className={`hidden 2xl:flex flex-col gap-4 fixed right-6 top-28 z-20 ${width}`}>
-        {blocks.map(({ tpl, tplBanners }) => (
-          <SidebarCarousel key={tpl._id} banners={tplBanners} options={tpl.options.sidebar} />
-        ))}
-      </div>
+      <div className={`hidden 2xl:flex flex-col gap-4 fixed left-6 top-28 z-20 ${width}`}>{rail}</div>
+      <div className={`hidden 2xl:flex flex-col gap-4 fixed right-6 top-28 z-20 ${width}`}>{rail}</div>
     </>
   );
 }
@@ -1093,6 +1320,55 @@ function SidebarSlot({ banner }: { banner: Banner }) {
   );
 
   return href ? <a href={href}>{content}</a> : content;
+}
+
+// Three stacked slots per rail, same rotation mechanics as SidebarCarousel —
+// the product-tagged counterpart of the banner sidebar rail.
+function ProductSidebarCarousel({
+  products,
+  options,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["sidebar"];
+}) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (!options.autoAdvance || products.length <= 1) return;
+    const id = setInterval(() => {
+      setIndex((i) => i + 1);
+    }, options.intervalMs);
+    return () => clearInterval(id);
+  }, [products.length, options.autoAdvance, options.intervalMs]);
+
+  if (products.length === 0) return null;
+
+  const slotCount = Math.min(SIDEBAR_SLOT_COUNT, products.length);
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {Array.from({ length: slotCount }, (_, slot) => (
+        <ProductSidebarSlot key={slot} product={products[mod(index + slot, products.length)]} />
+      ))}
+    </div>
+  );
+}
+
+function ProductSidebarSlot({ product }: { product: Product }) {
+  const { formatPrice } = useCurrency();
+  const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
+
+  return (
+    <a href={productHref(product)} className="relative block w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#111113] border border-white/10">
+      <ProductImage src={imgSrc} alt={product.name} className="w-full h-full" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-2.5">
+        <p className="text-xs font-semibold text-white leading-tight line-clamp-2">{product.name}</p>
+        <p className="text-xs text-gray-300 mt-0.5">{formatPrice(displayPrice)}</p>
+      </div>
+    </a>
+  );
 }
 
 /* ---------------------------- Banner carousel ---------------------------- */
@@ -1204,6 +1480,110 @@ function BannerSlide({ banner, active }: { banner: Banner; active: boolean }) {
     );
   }
   return <div className={className}>{content}</div>;
+}
+
+function ProductCarousel({
+  products,
+  options,
+  size,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["carousel"];
+  size: ProductTemplateSize;
+}) {
+  const [index, setIndex] = useState(0);
+
+  // Keep the index in range whenever the product set changes.
+  useEffect(() => {
+    setIndex((i) => (products.length === 0 ? 0 : i % products.length));
+  }, [products.length]);
+
+  useEffect(() => {
+    if (!options.autoAdvance) return;
+    if (products.length <= 1) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % products.length);
+    }, options.intervalMs);
+    return () => clearInterval(id);
+  }, [products.length, options.autoAdvance, options.intervalMs]);
+
+  return (
+    <div className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[size]}`}>
+      {products.map((p, i) => (
+        <ProductSlide key={p._id} product={p} active={i === index} />
+      ))}
+
+      {products.length > 1 && (
+        <>
+          {options.showArrows && (
+            <>
+              <button
+                onClick={() => setIndex((index - 1 + products.length) % products.length)}
+                aria-label="Previous product"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIndex((index + 1) % products.length)}
+                aria-label="Next product"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 rounded-full bg-black/50 border border-white/10 text-white hover:bg-black/70 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {options.showDots && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5">
+              {products.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIndex(i)}
+                  aria-label={`Go to product ${i + 1}`}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === index ? "w-6 bg-white" : "w-1.5 bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ProductSlide({ product, active }: { product: Product; active: boolean }) {
+  const { formatPrice } = useCurrency();
+  const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
+  const className = `absolute inset-0 block transition-opacity duration-700 ${
+    active ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+  }`;
+
+  const content = (
+    <>
+      {imgSrc ? (
+        <img src={imgSrc} alt={product.name} className="w-full h-full object-contain" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-white/5">
+          <ImageOff className="w-10 h-10 text-gray-600" />
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 px-6 md:px-12 pb-10 max-w-7xl mx-auto">
+        <h2 className="text-2xl md:text-4xl font-semibold text-white tracking-tight">{product.name}</h2>
+        <p className="text-sm md:text-base text-gray-300 mt-2">{formatPrice(displayPrice)}</p>
+      </div>
+    </>
+  );
+
+  return (
+    <a href={productHref(product)} className={className}>
+      {content}
+    </a>
+  );
 }
 
 /* ------------------------------ Banner grid ------------------------------ */
@@ -1342,6 +1722,73 @@ function BannerSpotlight({
   );
 }
 
+function ProductSpotlight({
+  products,
+  options,
+  size,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["spotlight"];
+  size: ProductTemplateSize;
+}) {
+  const { formatPrice } = useCurrency();
+  if (products.length === 0) return null;
+  const featured = products[0];
+  const rest = products.slice(1, 1 + options.maxListItems);
+
+  const featuredImg = featured.imageUrl || featured.images?.[0];
+  const featuredOnSale = !!featured.discountPercent && featured.discountPercent > 0;
+  const featuredPrice = featuredOnSale ? featured.effectivePrice ?? featured.price : featured.price;
+
+  const featuredCard = (
+    <div className={`relative w-full ${SPOTLIGHT_HEIGHT_CLASSES[size]} overflow-hidden rounded-2xl bg-[#111113]`}>
+      <ProductImage src={featuredImg} alt={featured.name} className="w-full h-full" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-6">
+        <h2 className="text-xl md:text-3xl font-semibold text-white tracking-tight">{featured.name}</h2>
+        <p className="text-sm text-gray-300 mt-2">{formatPrice(featuredPrice)}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="lg:w-2/3">
+          <a href={productHref(featured)} className="block">
+            {featuredCard}
+          </a>
+        </div>
+
+        {rest.length > 0 && (
+          <div className="lg:w-1/3 flex flex-row lg:flex-col gap-3 overflow-x-auto lg:overflow-visible">
+            {rest.map((product) => {
+              const imgSrc = product.imageUrl || product.images?.[0];
+              const onSale = !!product.discountPercent && product.discountPercent > 0;
+              const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
+              return (
+                <a
+                  key={product._id}
+                  href={productHref(product)}
+                  className="flex items-center gap-3 bg-[#111113] border border-white/10 rounded-xl p-3 w-64 lg:w-full shrink-0"
+                >
+                  <div className="h-14 w-14 shrink-0 rounded-lg overflow-hidden bg-white/5">
+                    <ProductImage src={imgSrc} alt={product.name} className="w-full h-full" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{product.name}</div>
+                    <div className="text-xs text-gray-500 truncate">{formatPrice(displayPrice)}</div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------- Banner bento ------------------------------- */
 
 const BENTO_ROW_CLASSES: Record<BannerSize, string> = {
@@ -1436,6 +1883,78 @@ function BentoCard({
   );
 }
 
+function ProductBento({
+  products,
+  options,
+  size,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["bento"];
+  size: ProductTemplateSize;
+}) {
+  if (products.length === 0) return null;
+  const featuredCount = Math.min(options.featuredCount, products.length);
+
+  return (
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+      <div className={`grid grid-cols-2 md:grid-cols-4 ${BENTO_ROW_CLASSES[size]} gap-4`}>
+        {products.map((product, i) => {
+          const isFeatured = i < featuredCount;
+          const isWide = !isFeatured && i === featuredCount;
+          const spanClass = isFeatured
+            ? "col-span-2 row-span-2"
+            : isWide
+            ? "col-span-2 row-span-1"
+            : "col-span-1 row-span-1";
+          return <ProductBentoCard key={product._id} product={product} large={isFeatured} className={spanClass} />;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ProductBentoCard({
+  product,
+  large,
+  className,
+}: {
+  product: Product;
+  large: boolean;
+  className: string;
+}) {
+  const { formatPrice } = useCurrency();
+  const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
+
+  const content = (
+    <div className="group relative h-full w-full overflow-hidden rounded-2xl bg-[#111113] border border-white/10">
+      <ProductImage
+        src={imgSrc}
+        alt={product.name}
+        className="w-full h-full group-hover:scale-105 transition-transform duration-300"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4">
+        <h3
+          className={`font-semibold text-white tracking-tight leading-tight line-clamp-2 ${
+            large ? "text-base md:text-xl" : "text-xs md:text-sm"
+          }`}
+        >
+          {product.name}
+        </h3>
+        {large && <p className="hidden md:block text-sm text-gray-300 mt-1.5">{formatPrice(displayPrice)}</p>}
+      </div>
+    </div>
+  );
+
+  return (
+    <a href={productHref(product)} className={className}>
+      {content}
+    </a>
+  );
+}
+
 /* ------------------------------ Banner marquee ------------------------------ */
 
 const MARQUEE_DURATIONS: Record<BannerTemplateOptions["marquee"]["speed"], string> = {
@@ -1504,6 +2023,66 @@ function MarqueeCard({ banner, sizeClass }: { banner: Banner; sizeClass: string 
   );
 
   return href ? <a href={href}>{content}</a> : content;
+}
+
+function ProductMarquee({
+  products,
+  options,
+  size,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["marquee"];
+  size: ProductTemplateSize;
+}) {
+  if (products.length === 0) return null;
+  // Four copies of the full set, shifted left by exactly one copy's width
+  // (25%), makes the loop seamless regardless of how many products there are.
+  const items = Array(4).fill(products).flat();
+  const animation = `marquee ${MARQUEE_DURATIONS[options.speed]} linear infinite${
+    options.direction === "right" ? " reverse" : ""
+  }`;
+
+  return (
+    <div className="py-8">
+      <div className="w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
+        <div
+          className={`flex w-max gap-4 px-2 ${options.pauseOnHover ? "hover:[animation-play-state:paused]" : ""}`}
+          style={{ animation }}
+        >
+          {items.map((product, i) => (
+            <ProductMarqueeCard key={`${product._id}-${i}`} product={product} sizeClass={MARQUEE_CARD_CLASSES[size]} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductMarqueeCard({ product, sizeClass }: { product: Product; sizeClass: string }) {
+  const { formatPrice } = useCurrency();
+  const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
+
+  return (
+    <a
+      href={productHref(product)}
+      className={`group relative ${sizeClass} shrink-0 overflow-hidden rounded-2xl bg-[#111113] border border-white/10`}
+    >
+      <ProductImage
+        src={imgSrc}
+        alt={product.name}
+        className="w-full h-full group-hover:scale-105 transition-transform duration-300"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4">
+        <h3 className="text-sm md:text-base font-semibold text-white tracking-tight leading-tight line-clamp-2">
+          {product.name}
+        </h3>
+        <p className="text-xs text-gray-300 mt-0.5">{formatPrice(displayPrice)}</p>
+      </div>
+    </a>
+  );
 }
 
 /* ------------------------------ Product card ------------------------------ */

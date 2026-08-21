@@ -22,7 +22,6 @@ import {
   RefreshCw,
   Sparkles,
   Info,
-  LayoutGrid,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -190,27 +189,66 @@ interface BannerTemplateFormValues {
   options: BannerTemplateOptions;
 }
 
-type ProductTemplatePosition = "top" | "above-grid" | "bottom";
+type ProductTemplateLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
+type ProductTemplatePosition = "top" | "above-grid" | "bottom" | "sidebar";
+type ProductTemplateSize = "small" | "medium" | "large" | "full";
+
+interface ProductTemplateOptions {
+  carousel: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
+    showDots: boolean;
+  };
+  grid: {
+    columns: number;
+    rows: number;
+    autoAdvance: boolean;
+    intervalMs: number;
+  };
+  spotlight: {
+    maxListItems: number;
+  };
+  sidebar: {
+    autoAdvance: boolean;
+    intervalMs: number;
+  };
+  showcase: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showArrows: boolean;
+  };
+  bento: {
+    featuredCount: number;
+  };
+  marquee: {
+    speed: "slow" | "normal" | "fast";
+    direction: "left" | "right";
+    pauseOnHover: boolean;
+  };
+}
 
 interface ProductTemplate {
   _id: string;
   name: string;
+  layout: ProductTemplateLayout;
   position: ProductTemplatePosition;
-  autoAdvance: boolean;
-  intervalMs: number;
+  size: ProductTemplateSize;
   isActive: boolean;
   order: number;
   applyToAllProducts: boolean;
+  options: ProductTemplateOptions;
 }
 
 interface ProductTemplateFormValues {
   name: string;
+  layout: ProductTemplateLayout;
   position: ProductTemplatePosition;
-  autoAdvance: boolean;
-  intervalMs: number;
+  size: ProductTemplateSize;
   isActive: boolean;
   order: number;
   applyToAllProducts: boolean;
+  options: ProductTemplateOptions;
 }
 
 const SIZE_OPTIONS: { value: BannerSize; label: string }[] = [
@@ -276,6 +314,63 @@ const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
   sidebar: { autoAdvance: true, intervalMs: 4000 },
   showcase: { autoAdvance: true, intervalMs: 5000, showArrows: true },
   bento: { featuredCount: 1, showSubtitle: true },
+  marquee: { speed: "normal", direction: "left", pauseOnHover: true },
+};
+
+// Same four-step scale and pixel ranges as SIZE_DIMENSIONS above — kept in
+// sync with the PRODUCT_* size-class tables in components/shop/ShopBrowser.tsx.
+const PRODUCT_SIZE_DIMENSIONS: Record<ProductTemplateLayout, Record<ProductTemplateSize, string>> = {
+  carousel: {
+    small: "Full width, 200–280px tall",
+    medium: "Full width, 280–380px tall",
+    large: "Full width, 360–480px tall",
+    full: "Full width, 70–88% of screen height",
+  },
+  grid: {
+    small: "Section up to 1280px wide",
+    medium: "Section up to 1600px wide",
+    large: "Section up to 1920px wide",
+    full: "Section spans the full screen width",
+  },
+  spotlight: {
+    small: "Up to 1280px wide, featured product 200–300px tall",
+    medium: "Up to 1600px wide, featured product 280–420px tall",
+    large: "Up to 1920px wide, featured product 340–500px tall",
+    full: "Full width, featured product 60–75% of screen height",
+  },
+  sidebar: {
+    small: "Rail width 160px",
+    medium: "Rail width 192px",
+    large: "Rail width 224px",
+    full: "Rail width 256px",
+  },
+  showcase: {
+    small: "Up to 1280px wide, row 160–240px tall",
+    medium: "Up to 1600px wide, row 220–320px tall",
+    large: "Up to 1920px wide, row 280–400px tall",
+    full: "Full width, row 55–70% of screen height",
+  },
+  bento: {
+    small: "Up to 1280px wide, tile rows 100–115px",
+    medium: "Up to 1600px wide, tile rows 130–150px",
+    large: "Up to 1920px wide, tile rows 160–190px",
+    full: "Full width, tile rows 200–240px",
+  },
+  marquee: {
+    small: "Cards ~224×128px – 288×176px",
+    medium: "Cards ~288×160px – 384×224px",
+    large: "Cards ~320×192px – 420×256px",
+    full: "Cards ~384×224px – 480×288px",
+  },
+};
+
+const DEFAULT_PRODUCT_TEMPLATE_OPTIONS: ProductTemplateOptions = {
+  carousel: { autoAdvance: true, intervalMs: 5000, showArrows: true, showDots: true },
+  grid: { columns: 4, rows: 2, autoAdvance: true, intervalMs: 5000 },
+  spotlight: { maxListItems: 4 },
+  sidebar: { autoAdvance: true, intervalMs: 4000 },
+  showcase: { autoAdvance: true, intervalMs: 5000, showArrows: true },
+  bento: { featuredCount: 1 },
   marquee: { speed: "normal", direction: "left", pauseOnHover: true },
 };
 
@@ -1063,13 +1158,29 @@ function ProductTemplateForm({
   onSubmit: (values: ProductTemplateFormValues) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
+  const [layout, setLayout] = useState<ProductTemplateLayout>(initial?.layout ?? "grid");
   const [position, setPosition] = useState<ProductTemplatePosition>(initial?.position ?? "top");
-  const [order, setOrder] = useState(initial ? String(initial.order) : "0");
-  const [autoAdvance, setAutoAdvance] = useState(initial?.autoAdvance ?? true);
-  const [intervalMs, setIntervalMs] = useState(initial?.intervalMs ?? 5000);
+  const [size, setSize] = useState<ProductTemplateSize>(initial?.size ?? "medium");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  const [order, setOrder] = useState(initial ? String(initial.order) : "0");
   const [applyToAllProducts, setApplyToAllProducts] = useState(initial?.applyToAllProducts ?? false);
+  const [options, setOptions] = useState<ProductTemplateOptions>(initial?.options ?? DEFAULT_PRODUCT_TEMPLATE_OPTIONS);
   const toast = useToast();
+
+  const updateCarousel = (patch: Partial<ProductTemplateOptions["carousel"]>) =>
+    setOptions((prev) => ({ ...prev, carousel: { ...prev.carousel, ...patch } }));
+  const updateGrid = (patch: Partial<ProductTemplateOptions["grid"]>) =>
+    setOptions((prev) => ({ ...prev, grid: { ...prev.grid, ...patch } }));
+  const updateSpotlight = (patch: Partial<ProductTemplateOptions["spotlight"]>) =>
+    setOptions((prev) => ({ ...prev, spotlight: { ...prev.spotlight, ...patch } }));
+  const updateSidebar = (patch: Partial<ProductTemplateOptions["sidebar"]>) =>
+    setOptions((prev) => ({ ...prev, sidebar: { ...prev.sidebar, ...patch } }));
+  const updateShowcase = (patch: Partial<ProductTemplateOptions["showcase"]>) =>
+    setOptions((prev) => ({ ...prev, showcase: { ...prev.showcase, ...patch } }));
+  const updateBento = (patch: Partial<ProductTemplateOptions["bento"]>) =>
+    setOptions((prev) => ({ ...prev, bento: { ...prev.bento, ...patch } }));
+  const updateMarquee = (patch: Partial<ProductTemplateOptions["marquee"]>) =>
+    setOptions((prev) => ({ ...prev, marquee: { ...prev.marquee, ...patch } }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1079,12 +1190,13 @@ function ProductTemplateForm({
     }
     onSubmit({
       name: name.trim(),
-      position,
-      order: Number.parseInt(order, 10) || 0,
-      autoAdvance,
-      intervalMs,
+      layout,
+      position: layout === "sidebar" ? "sidebar" : position,
+      size,
       isActive,
+      order: Number.parseInt(order, 10) || 0,
       applyToAllProducts,
+      options,
     });
   };
 
@@ -1116,11 +1228,67 @@ function ProductTemplateForm({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
-          <SegmentedControl value={position} onChange={setPosition} options={PRODUCT_TEMPLATE_POSITION_OPTIONS} />
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Layout</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {PRODUCT_LAYOUT_TEMPLATES.map((tpl) => (
+            <button
+              type="button"
+              key={tpl.id}
+              onClick={() => setLayout(tpl.id)}
+              className={`text-left rounded-xl border p-4 transition-colors ${
+                layout === tpl.id ? "border-white bg-white/5" : "border-white/10 hover:border-white/20"
+              }`}
+            >
+              <LayoutPreview layout={tpl.id} />
+              <div className="text-sm font-medium text-white mt-3">{tpl.label}</div>
+              <div className="text-xs text-gray-500 mt-1">{tpl.description}</div>
+            </button>
+          ))}
         </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <label className="text-xs text-gray-500 block">Size</label>
+          <InfoTooltip>
+            <p className="font-medium text-white mb-2">
+              {PRODUCT_LAYOUT_TEMPLATES.find((l) => l.id === layout)?.label ?? layout} dimensions
+            </p>
+            <ul className="space-y-1.5">
+              {SIZE_OPTIONS.map((opt) => (
+                <li key={opt.value} className="flex items-baseline justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">{opt.label}</span>
+                  <span className="text-gray-300 text-right">{PRODUCT_SIZE_DIMENSIONS[layout][opt.value]}</span>
+                </li>
+              ))}
+            </ul>
+          </InfoTooltip>
+        </div>
+        <SegmentedControl value={size} onChange={setSize} options={SIZE_OPTIONS} />
+        <p className="text-xs text-gray-600 mt-1.5">
+          How prominent this product block is on the shop page — applies no matter which layout you pick above.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {layout === "sidebar" ? (
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
+            <p className="text-sm text-gray-400 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              Fixed to the page&apos;s left and right margins
+            </p>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
+            <SegmentedControl
+              value={position as "top" | "above-grid" | "bottom"}
+              onChange={setPosition}
+              options={PRODUCT_TEMPLATE_POSITION_OPTIONS}
+            />
+          </div>
+        )}
         <div>
           <label className="text-xs text-gray-500 mb-1.5 block">Order within position</label>
           <input
@@ -1134,28 +1302,250 @@ function ProductTemplateForm({
         </div>
       </div>
 
-      <div className="space-y-4">
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={autoAdvance}
-            onChange={(e) => setAutoAdvance(e.target.checked)}
-            className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
-          />
-          <span className="text-sm text-gray-300">Auto-advance</span>
-        </label>
+      {layout === "carousel" && (
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.carousel.autoAdvance}
+              onChange={(e) => updateCarousel({ autoAdvance: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Auto-advance</span>
+          </label>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+            <ClampedNumberInput
+              min={2}
+              max={10}
+              fallback={5}
+              value={Math.round(options.carousel.intervalMs / 1000)}
+              onCommit={(seconds) => updateCarousel({ intervalMs: seconds * 1000 })}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.carousel.showArrows}
+                onChange={(e) => updateCarousel({ showArrows: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Show arrows</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.carousel.showDots}
+                onChange={(e) => updateCarousel({ showDots: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Show dots</span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {layout === "grid" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Columns</label>
+              <SegmentedControl
+                value={options.grid.columns}
+                onChange={(v) => updateGrid({ columns: v })}
+                options={[
+                  { value: 2, label: "2" },
+                  { value: 3, label: "3" },
+                  { value: 4, label: "4" },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Rows</label>
+              <SegmentedControl
+                value={options.grid.rows}
+                onChange={(v) => updateGrid({ rows: v })}
+                options={[
+                  { value: 1, label: "1" },
+                  { value: 2, label: "2" },
+                  { value: 3, label: "3" },
+                ]}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.grid.autoAdvance}
+              onChange={(e) => updateGrid({ autoAdvance: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Auto-advance</span>
+          </label>
+          <p className="text-xs text-gray-600">
+            On: pages through the tagged products, {options.grid.columns * options.grid.rows} at a time. Off:
+            shows every tagged product at once in one grid.
+          </p>
+          {options.grid.autoAdvance && (
+            <div className="max-w-xs">
+              <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+              <ClampedNumberInput
+                min={2}
+                max={10}
+                fallback={5}
+                value={Math.round(options.grid.intervalMs / 1000)}
+                onCommit={(seconds) => updateGrid({ intervalMs: seconds * 1000 })}
+                className={inputClass}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {layout === "spotlight" && (
         <div className="max-w-xs">
-          <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+          <label className="text-xs text-gray-500 mb-1.5 block">Max list items</label>
           <ClampedNumberInput
-            min={2}
-            max={10}
-            fallback={5}
-            value={Math.round(intervalMs / 1000)}
-            onCommit={(seconds) => setIntervalMs(seconds * 1000)}
+            min={1}
+            max={8}
+            fallback={4}
+            value={options.spotlight.maxListItems}
+            onCommit={(value) => updateSpotlight({ maxListItems: value })}
             className={inputClass}
           />
         </div>
-      </div>
+      )}
+
+      {layout === "sidebar" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Tag as many products to this template as you like below — the left and right rails will cycle
+            through all of them.
+          </p>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.sidebar.autoAdvance}
+              onChange={(e) => updateSidebar({ autoAdvance: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Auto-advance</span>
+          </label>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+            <ClampedNumberInput
+              min={2}
+              max={15}
+              fallback={4}
+              value={Math.round(options.sidebar.intervalMs / 1000)}
+              onCommit={(seconds) => updateSidebar({ intervalMs: seconds * 1000 })}
+              className={inputClass}
+            />
+          </div>
+        </div>
+      )}
+
+      {layout === "showcase" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Tag 4 or more products to this template — two show large in the center, the rest peek at the
+            edges. Arrows (or auto-advance) slide the row by one product at a time.
+          </p>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.showcase.autoAdvance}
+              onChange={(e) => updateShowcase({ autoAdvance: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Auto-advance</span>
+          </label>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+            <ClampedNumberInput
+              min={2}
+              max={10}
+              fallback={5}
+              value={Math.round(options.showcase.intervalMs / 1000)}
+              onCommit={(seconds) => updateShowcase({ intervalMs: seconds * 1000 })}
+              className={inputClass}
+            />
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.showcase.showArrows}
+              onChange={(e) => updateShowcase({ showArrows: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Show arrows</span>
+          </label>
+        </div>
+      )}
+
+      {layout === "bento" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            The first products (by order) become the large featured tiles; the rest fill in as smaller
+            cells around them.
+          </p>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Featured tiles</label>
+            <SegmentedControl
+              value={options.bento.featuredCount}
+              onChange={(v) => updateBento({ featuredCount: v })}
+              options={[
+                { value: 1, label: "1 large" },
+                { value: 2, label: "2 large" },
+              ]}
+            />
+          </div>
+        </div>
+      )}
+
+      {layout === "marquee" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Every tagged product scrolls past in one continuous, looping strip.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Speed</label>
+              <SegmentedControl
+                value={options.marquee.speed}
+                onChange={(v) => updateMarquee({ speed: v })}
+                options={[
+                  { value: "slow", label: "Slow" },
+                  { value: "normal", label: "Normal" },
+                  { value: "fast", label: "Fast" },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">Direction</label>
+              <SegmentedControl
+                value={options.marquee.direction}
+                onChange={(v) => updateMarquee({ direction: v })}
+                options={[
+                  { value: "left", label: "Left" },
+                  { value: "right", label: "Right" },
+                ]}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={options.marquee.pauseOnHover}
+              onChange={(e) => updateMarquee({ pauseOnHover: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            <span className="text-sm text-gray-300">Pause on hover</span>
+          </label>
+        </div>
+      )}
 
       <label className="flex items-center gap-3 cursor-pointer select-none">
         <input
@@ -1164,7 +1554,7 @@ function ProductTemplateForm({
           onChange={(e) => setIsActive(e.target.checked)}
           className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
         />
-        <span className="text-sm text-gray-300">Active</span>
+        <span className="text-sm text-gray-300">Active (renders on the shop page)</span>
       </label>
 
       <div className="flex justify-end gap-3 pt-2">
@@ -1225,6 +1615,24 @@ function ProductTemplatesSection({
     top: "Top of page",
     "above-grid": "Above products",
     bottom: "Bottom of page",
+    sidebar: "Page sides (left + right)",
+  };
+
+  const intervalLabel = (tpl: ProductTemplate): string | null => {
+    switch (tpl.layout) {
+      case "carousel":
+        return tpl.options.carousel.autoAdvance ? `Every ${Math.round(tpl.options.carousel.intervalMs / 1000)}s` : "Auto-advance off";
+      case "grid":
+        return tpl.options.grid.autoAdvance ? `Every ${Math.round(tpl.options.grid.intervalMs / 1000)}s` : "Static grid";
+      case "sidebar":
+        return tpl.options.sidebar.autoAdvance ? `Every ${Math.round(tpl.options.sidebar.intervalMs / 1000)}s` : "Auto-advance off";
+      case "showcase":
+        return tpl.options.showcase.autoAdvance ? `Every ${Math.round(tpl.options.showcase.intervalMs / 1000)}s` : "Auto-advance off";
+      case "marquee":
+        return "Continuous scroll";
+      default:
+        return null;
+    }
   };
 
   return (
@@ -1236,63 +1644,67 @@ function ProductTemplatesSection({
         </button>
       </div>
       <p className="text-xs text-gray-500 mb-4">
-        An auto-rotating 2-row grid of tagged products. Every active template renders on the shop page at its own position.
+        Every active template renders on the shop page at its own position, all at once.
       </p>
 
       {templates.length === 0 ? (
         <EmptyState message="No product templates yet. Add one, then tag products into it from the product form." />
       ) : (
         <div className="space-y-3">
-          {templates.map((tpl) => (
-            <div
-              key={tpl._id}
-              className="flex items-center gap-4 bg-[#0a0a0b] border border-white/10 rounded-xl p-4"
-            >
-              <div className="h-10 w-10 shrink-0 rounded-lg bg-white/5 grid place-items-center">
-                <LayoutGrid className="w-4 h-4 text-gray-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-white truncate">{tpl.name}</h4>
-                  <span
-                    className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border ${
-                      tpl.isActive
-                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                        : "bg-white/5 text-gray-500 border-white/10"
-                    }`}
-                  >
-                    {tpl.isActive ? "Live" : "Hidden"}
-                  </span>
+          {templates.map((tpl) => {
+            const interval = intervalLabel(tpl);
+            return (
+              <div
+                key={tpl._id}
+                className="flex items-center gap-4 bg-[#0a0a0b] border border-white/10 rounded-xl p-4"
+              >
+                <div className="h-10 w-10 shrink-0 rounded-lg bg-white/5 grid place-items-center">
+                  <LayoutPreview layout={tpl.layout} />
                 </div>
-                <p className="text-xs text-gray-500 mt-1 truncate">
-                  {POSITION_LABELS[tpl.position]}
-                  {tpl.autoAdvance ? ` · Every ${Math.round(tpl.intervalMs / 1000)}s` : " · Auto-advance off"} · Order{" "}
-                  {tpl.order} · {tpl.applyToAllProducts ? "All products" : "Tagged products"}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-medium text-white truncate">{tpl.name}</h4>
+                    <span
+                      className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                        tpl.isActive
+                          ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                          : "bg-white/5 text-gray-500 border-white/10"
+                      }`}
+                    >
+                      {tpl.isActive ? "Live" : "Hidden"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 truncate">
+                    {PRODUCT_LAYOUT_TEMPLATES.find((l) => l.id === tpl.layout)?.label ?? tpl.layout} ·{" "}
+                    {POSITION_LABELS[tpl.position]}
+                    {interval && ` · ${interval}`} · Order {tpl.order} ·{" "}
+                    {tpl.applyToAllProducts ? "All products" : "Tagged products"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => openEdit(tpl)}
+                    aria-label="Edit template"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDelete(tpl)}
+                    aria-label="Delete template"
+                    className="text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={() => openEdit(tpl)}
-                  aria-label="Edit template"
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onDelete(tpl)}
-                  aria-label="Delete template"
-                  className="text-red-400 hover:text-red-300 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {showForm && (
-        <Modal title={editing ? "Edit template" : "Add template"} onClose={closeForm}>
+        <Modal title={editing ? "Edit template" : "Add template"} onClose={closeForm} widthClass="max-w-4xl">
           <ProductTemplateForm initial={editing} submitting={submitting} onCancel={closeForm} onSubmit={handleSubmit} />
         </Modal>
       )}
@@ -1741,6 +2153,44 @@ function LayoutPreview({ layout }: { layout: BannerLayout }) {
   }
   return <div className="h-12 w-full rounded-md bg-white/20" />;
 }
+
+const PRODUCT_LAYOUT_TEMPLATES: { id: ProductTemplateLayout; label: string; description: string }[] = [
+  {
+    id: "carousel",
+    label: "Carousel",
+    description: "One full-width product at a time, auto-advancing.",
+  },
+  {
+    id: "grid",
+    label: "Grid",
+    description: "Tagged products in a 2-row grid; optionally auto-advances to the next set.",
+  },
+  {
+    id: "spotlight",
+    label: "Spotlight",
+    description: "One featured product with a list of others beside it.",
+  },
+  {
+    id: "sidebar",
+    label: "Sidebar",
+    description: "Small auto-rotating products fixed to the page's left and right margins.",
+  },
+  {
+    id: "showcase",
+    label: "Showcase",
+    description: "A row with two large products in the center and smaller ones peeking at each side.",
+  },
+  {
+    id: "bento",
+    label: "Bento",
+    description: "Modern asymmetric grid — one or two large featured tiles with smaller ones filling in around them.",
+  },
+  {
+    id: "marquee",
+    label: "Marquee",
+    description: "All tagged products in one continuous, auto-scrolling strip.",
+  },
+];
 
 function SegmentedControl<T extends string | number>({
   value,
