@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Package,
@@ -531,21 +531,138 @@ function ImageField({
   );
 }
 
+/* ---------------------------------- Category picker ---------------------------------- */
+
+function CategoryPicker({
+  value,
+  onChange,
+  categories,
+  categoryCounts,
+  onRenameCategory,
+  onDeleteCategory,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  categories: string[];
+  categoryCounts: Record<string, number>;
+  onRenameCategory: (oldName: string, newName: string) => Promise<void>;
+  onDeleteCategory: (name: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const filtered = categories.filter((cat) =>
+    cat.toLowerCase().includes(value.trim().toLowerCase())
+  );
+
+  const handleRename = async (cat: string) => {
+    const next = window.prompt(`Rename category "${cat}" to:`, cat);
+    if (!next || !next.trim() || next.trim() === cat) return;
+    setBusy(cat);
+    try {
+      await onRenameCategory(cat, next.trim());
+      if (value === cat) onChange(next.trim());
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDelete = async (cat: string) => {
+    const count = categoryCounts[cat] ?? 0;
+    const warning =
+      count > 0
+        ? `Delete "${cat}"? ${count} product${count !== 1 ? "s" : ""} will be moved to "Uncategorized". This cannot be undone.`
+        : `Delete "${cat}"? This cannot be undone.`;
+    if (!window.confirm(warning)) return;
+    setBusy(cat);
+    try {
+      await onDeleteCategory(cat);
+      if (value === cat) onChange("");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <input
+        required
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="e.g. Electronics"
+        autoComplete="off"
+        className={inputClass}
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-1 shadow-xl">
+          {filtered.map((cat) => (
+            <div key={cat} className="flex items-center gap-1 px-2 py-1 hover:bg-white/5">
+              <button
+                type="button"
+                onMouseDown={() => {
+                  onChange(cat);
+                  setOpen(false);
+                }}
+                className="flex-1 truncate px-1.5 py-1 text-left text-sm text-gray-200"
+              >
+                {cat}
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleRename(cat);
+                }}
+                disabled={busy === cat}
+                aria-label={`Rename ${cat}`}
+                className="shrink-0 rounded-lg p-1.5 text-gray-500 transition-colors hover:text-white disabled:opacity-40"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleDelete(cat);
+                }}
+                disabled={busy === cat}
+                aria-label={`Delete ${cat}`}
+                className="shrink-0 rounded-lg p-1.5 text-red-400/80 transition-colors hover:text-red-300 disabled:opacity-40"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------------------------------- Product form ---------------------------------- */
 
 function ProductForm({
   initial,
   categories,
+  categoryCounts,
   submitting,
   onCancel,
   onSubmit,
+  onRenameCategory,
+  onDeleteCategory,
 }: {
   initial: Product | null;
   categories: string[];
+  categoryCounts: Record<string, number>;
   submitting: boolean;
   onCancel: () => void;
   onSubmit: (values: ProductFormValues) => void;
+  onRenameCategory: (oldName: string, newName: string) => Promise<void>;
+  onDeleteCategory: (name: string) => Promise<void>;
 }) {
+  const { selectedCurrency } = useCurrency();
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [price, setPrice] = useState(initial ? String(initial.price) : "");
@@ -584,19 +701,14 @@ function ProductForm({
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1.5 block">Category</label>
-          <input
-            required
-            list="product-category-options"
+          <CategoryPicker
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="e.g. Electronics"
-            className={inputClass}
+            onChange={setCategory}
+            categories={categories}
+            categoryCounts={categoryCounts}
+            onRenameCategory={onRenameCategory}
+            onDeleteCategory={onDeleteCategory}
           />
-          <datalist id="product-category-options">
-            {categories.map((cat) => (
-              <option key={cat} value={cat} />
-            ))}
-          </datalist>
         </div>
       </div>
 
@@ -614,7 +726,12 @@ function ProductForm({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="text-xs text-gray-500 mb-1.5 block">Price</label>
+          <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
+            Price
+            <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-gray-300">
+              {selectedCurrency}
+            </span>
+          </label>
           <input
             required
             type="number"
@@ -867,18 +984,28 @@ function ProductsSection({
   onCreate,
   onUpdate,
   onDelete,
+  onRenameCategory,
+  onDeleteCategory,
 }: {
   products: Product[];
   categories: string[];
   onCreate: (values: ProductFormValues) => Promise<void>;
   onUpdate: (id: string, values: ProductFormValues) => Promise<void>;
   onDelete: (product: Product) => Promise<void>;
+  onRenameCategory: (oldName: string, newName: string) => Promise<void>;
+  onDeleteCategory: (name: string) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
   const { formatPrice } = useCurrency();
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of products) counts[p.category] = (counts[p.category] ?? 0) + 1;
+    return counts;
+  }, [products]);
 
   const openCreate = () => {
     setEditing(null);
@@ -1004,9 +1131,12 @@ function ProductsSection({
           <ProductForm
             initial={editing}
             categories={categories}
+            categoryCounts={categoryCounts}
             submitting={submitting}
             onCancel={closeForm}
             onSubmit={handleSubmit}
+            onRenameCategory={onRenameCategory}
+            onDeleteCategory={onDeleteCategory}
           />
         </Modal>
       )}
@@ -2537,6 +2667,29 @@ export function AdminDashboard() {
     }
   };
 
+  const handleRenameCategory = async (oldName: string, newName: string) => {
+    try {
+      await apiFetch(`/admin/categories/${encodeURIComponent(oldName)}`, {
+        method: "PUT",
+        body: { newName },
+      });
+      toast.success("Category renamed");
+      await Promise.all([fetchProducts(), fetchCategories()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to rename category"));
+    }
+  };
+
+  const handleDeleteCategory = async (name: string) => {
+    try {
+      await apiFetch(`/admin/categories/${encodeURIComponent(name)}`, { method: "DELETE" });
+      toast.success("Category deleted");
+      await Promise.all([fetchProducts(), fetchCategories()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to delete category"));
+    }
+  };
+
   /* ---- Orders ---- */
 
   const handleOrderStatusChange = async (order: Order, status: OrderStatus) => {
@@ -2737,6 +2890,8 @@ export function AdminDashboard() {
               onCreate={handleCreateProduct}
               onUpdate={handleUpdateProduct}
               onDelete={handleDeleteProduct}
+              onRenameCategory={handleRenameCategory}
+              onDeleteCategory={handleDeleteCategory}
             />
           )}
           {activeTab === "orders" && (
