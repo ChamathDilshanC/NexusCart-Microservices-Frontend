@@ -51,7 +51,7 @@ function bannerHref(banner: Banner): string | undefined {
   return banner.productId ? `/product/${banner.productId}` : banner.linkUrl || undefined;
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee" | "cinematic";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 // How prominent the banner block is on screen — shared by every layout, each
 // mapping the same four steps to its own height/width scale below.
@@ -91,6 +91,12 @@ interface BannerTemplateOptions {
     direction: "left" | "right";
     pauseOnHover: boolean;
   };
+  cinematic: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showProgressBar: boolean;
+    kenBurnsEffect: boolean;
+  };
 }
 
 interface BannerTemplate {
@@ -104,7 +110,7 @@ interface BannerTemplate {
   options: BannerTemplateOptions;
 }
 
-type ProductTemplateLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
+type ProductTemplateLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee" | "cinematic";
 type ProductTemplatePosition = "top" | "above-grid" | "bottom" | "sidebar";
 type ProductTemplateSize = "small" | "medium" | "large" | "full";
 
@@ -140,6 +146,12 @@ interface ProductTemplateOptions {
     speed: "slow" | "normal" | "fast";
     direction: "left" | "right";
     pauseOnHover: boolean;
+  };
+  cinematic: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showProgressBar: boolean;
+    kenBurnsEffect: boolean;
   };
 }
 
@@ -904,6 +916,9 @@ function BannerBlock({ template, banners }: { template: BannerTemplate; banners:
   if (template.layout === "marquee") {
     return <BannerMarquee banners={banners} options={template.options.marquee} size={size} />;
   }
+  if (template.layout === "cinematic") {
+    return <BannerCinematic banners={banners} options={template.options.cinematic} size={size} />;
+  }
   return <BannerCarousel banners={banners} options={template.options.carousel} size={size} />;
 }
 
@@ -932,6 +947,9 @@ function ProductTemplateBlock({ template, products }: { template: ProductTemplat
   if (template.layout === "marquee") {
     return <ProductMarquee products={products} options={template.options.marquee} size={size} />;
   }
+  if (template.layout === "cinematic") {
+    return <ProductCinematic products={products} options={template.options.cinematic} size={size} />;
+  }
   return <ProductGrid products={products} options={template.options.grid} size={size} />;
 }
 
@@ -953,24 +971,30 @@ function ProductGrid({
     [products, options.autoAdvance, pageSize]
   );
   const [page, setPage] = useState(0);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     setPage((p) => (pages.length === 0 ? 0 : p % pages.length));
   }, [pages.length]);
 
   useEffect(() => {
-    if (!options.autoAdvance) return;
+    if (!options.autoAdvance || hovered) return;
     if (pages.length <= 1) return;
     const id = setInterval(() => setPage((p) => (p + 1) % pages.length), options.intervalMs);
     return () => clearInterval(id);
-  }, [pages.length, options.autoAdvance, options.intervalMs]);
+  }, [pages.length, options.autoAdvance, options.intervalMs, hovered]);
 
   if (products.length === 0) return null;
 
   const columnClass = GRID_COLUMN_CLASSES[options.columns] ?? GRID_COLUMN_CLASSES[3];
+  const isFull = size === "full";
 
   return (
-    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div
+      className={`${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto px-6"} py-8`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {options.autoAdvance ? (
         <div className="overflow-hidden">
           {/* items-start keeps each page sized to its own content — without it,
@@ -1038,14 +1062,13 @@ function BannerShowcase({
 }) {
   const sorted = useMemo(() => [...banners].sort((a, b) => a.order - b.order), [banners]);
   const [step, setStep] = useState(0);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    if (!options.autoAdvance || sorted.length <= 1) return;
-    // Stepping forward walks each banner's offset from -1 up to 4, so on
-    // screen it enters at the left edge and flows across to exit on the right.
+    if (!options.autoAdvance || sorted.length <= 1 || hovered) return;
     const id = setInterval(() => setStep((s) => s + 1), options.intervalMs);
     return () => clearInterval(id);
-  }, [sorted.length, options.autoAdvance, options.intervalMs]);
+  }, [sorted.length, options.autoAdvance, options.intervalMs, hovered]);
 
   if (sorted.length === 0) return null;
 
@@ -1063,9 +1086,14 @@ function BannerShowcase({
   const slots = SHOWCASE_OFFSETS.map((offset) => ({ offset, banner: offsetToBanner.get(offset) ?? null }));
 
   const advance = (delta: number) => setStep((s) => s + delta);
+  const isFull = size === "full";
 
   return (
-    <div className={`relative ${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div
+      className={`relative ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto px-6"} py-8`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div className={`flex items-stretch gap-3 md:gap-4 overflow-hidden ${SHOWCASE_HEIGHT_CLASSES[size]}`}>
         {slots.map(({ offset, banner }) =>
           banner ? (
@@ -1159,12 +1187,13 @@ function ProductShowcase({
   size: ProductTemplateSize;
 }) {
   const [step, setStep] = useState(0);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    if (!options.autoAdvance || products.length <= 1) return;
+    if (!options.autoAdvance || products.length <= 1 || hovered) return;
     const id = setInterval(() => setStep((s) => s + 1), options.intervalMs);
     return () => clearInterval(id);
-  }, [products.length, options.autoAdvance, options.intervalMs]);
+  }, [products.length, options.autoAdvance, options.intervalMs, hovered]);
 
   if (products.length === 0) return null;
 
@@ -1179,9 +1208,14 @@ function ProductShowcase({
   const slots = SHOWCASE_OFFSETS.map((offset) => ({ offset, product: offsetToProduct.get(offset) ?? null }));
 
   const advance = (delta: number) => setStep((s) => s + delta);
+  const isFull = size === "full";
 
   return (
-    <div className={`relative ${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div
+      className={`relative ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto px-6"} py-8`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div className={`flex items-stretch gap-3 md:gap-4 overflow-hidden ${SHOWCASE_HEIGHT_CLASSES[size]}`}>
         {slots.map(({ offset, product }) =>
           product ? (
@@ -1413,6 +1447,7 @@ function BannerCarousel({
   size: BannerSize;
 }) {
   const [index, setIndex] = useState(0);
+  const [hovered, setHovered] = useState(false);
 
   // Keep the index in range whenever the banner set changes.
   useEffect(() => {
@@ -1420,17 +1455,19 @@ function BannerCarousel({
   }, [banners.length]);
 
   useEffect(() => {
-    if (!options.autoAdvance) return;
+    if (!options.autoAdvance || hovered) return;
     if (banners.length <= 1) return;
     const id = setInterval(() => {
       setIndex((i) => (i + 1) % banners.length);
     }, options.intervalMs);
     return () => clearInterval(id);
-  }, [banners.length, options.autoAdvance, options.intervalMs]);
+  }, [banners.length, options.autoAdvance, options.intervalMs, hovered]);
 
   return (
     <div
       className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[size]}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       {banners.map((b, i) => (
         <BannerSlide key={b._id} banner={b} active={i === index} />
@@ -1515,6 +1552,7 @@ function ProductCarousel({
   size: ProductTemplateSize;
 }) {
   const [index, setIndex] = useState(0);
+  const [hovered, setHovered] = useState(false);
 
   // Keep the index in range whenever the product set changes.
   useEffect(() => {
@@ -1522,16 +1560,20 @@ function ProductCarousel({
   }, [products.length]);
 
   useEffect(() => {
-    if (!options.autoAdvance) return;
+    if (!options.autoAdvance || hovered) return;
     if (products.length <= 1) return;
     const id = setInterval(() => {
       setIndex((i) => (i + 1) % products.length);
     }, options.intervalMs);
     return () => clearInterval(id);
-  }, [products.length, options.autoAdvance, options.intervalMs]);
+  }, [products.length, options.autoAdvance, options.intervalMs, hovered]);
 
   return (
-    <div className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[size]}`}>
+    <div
+      className={`relative w-full overflow-hidden bg-[#111113] ${CAROUSEL_HEIGHT_CLASSES[size]}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {products.map((p, i) => (
         <ProductSlide key={p._id} product={p} active={i === index} />
       ))}
@@ -1631,7 +1673,7 @@ function BannerGrid({
   const aspectClass = options.aspectRatio === "square" ? "aspect-square" : "aspect-video";
 
   return (
-    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} ${size === "full" ? "" : "mx-auto px-6"} py-8`}>
       <div className={`grid grid-cols-1 ${columnClass} gap-4`}>
         {sorted.map((banner) => {
           const card = (
@@ -1701,7 +1743,7 @@ function BannerSpotlight({
   );
 
   return (
-    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} ${size === "full" ? "" : "mx-auto px-6"} py-8`}>
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="lg:w-2/3">
           {bannerHref(featured) ? (
@@ -1775,7 +1817,7 @@ function ProductSpotlight({
   );
 
   return (
-    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} ${size === "full" ? "" : "mx-auto px-6"} py-8`}>
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="lg:w-2/3">
           <a href={productHref(featured)} className="block">
@@ -1835,7 +1877,7 @@ function BannerBento({
   const featuredCount = Math.min(options.featuredCount, sorted.length);
 
   return (
-    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} ${size === "full" ? "" : "mx-auto px-6"} py-8`}>
       <div className={`grid grid-cols-2 md:grid-cols-4 ${BENTO_ROW_CLASSES[size]} gap-4`}>
         {sorted.map((banner, i) => {
           const isFeatured = i < featuredCount;
@@ -1919,7 +1961,7 @@ function ProductBento({
   const featuredCount = Math.min(options.featuredCount, products.length);
 
   return (
-    <div className={`${BANNER_CONTAINER_WIDTH[size]} mx-auto px-6 py-8`}>
+    <div className={`${BANNER_CONTAINER_WIDTH[size]} ${size === "full" ? "" : "mx-auto px-6"} py-8`}>
       <div className={`grid grid-cols-2 md:grid-cols-4 ${BENTO_ROW_CLASSES[size]} gap-4`}>
         {products.map((product, i) => {
           const isFeatured = i < featuredCount;
@@ -2105,6 +2147,295 @@ function ProductMarqueeCard({ product, sizeClass }: { product: Product; sizeClas
         <p className="text-xs text-gray-300 mt-0.5">{formatPrice(displayPrice)}</p>
       </div>
     </a>
+  );
+}
+
+/* ------------------------------ Cinematic layout ------------------------------ */
+
+const CINEMATIC_HEIGHT_CLASSES: Record<BannerSize, string> = {
+  small: "h-[300px] md:h-[420px]",
+  medium: "h-[400px] md:h-[560px]",
+  large: "h-[500px] md:h-[680px]",
+  full: "h-[85vh] md:h-[92vh]",
+};
+
+function BannerCinematic({
+  banners,
+  options,
+  size,
+}: {
+  banners: Banner[];
+  options: BannerTemplateOptions["cinematic"];
+  size: BannerSize;
+}) {
+  const sorted = useMemo(() => [...banners].sort((a, b) => a.order - b.order), [banners]);
+  const [index, setIndex] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const [progressKey, setProgressKey] = useState(0);
+
+  useEffect(() => {
+    setIndex((i) => (sorted.length === 0 ? 0 : i % sorted.length));
+  }, [sorted.length]);
+
+  useEffect(() => {
+    if (!options.autoAdvance || hovered) return;
+    if (sorted.length <= 1) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % sorted.length);
+      setProgressKey((k) => k + 1);
+    }, options.intervalMs);
+    return () => clearInterval(id);
+  }, [sorted.length, options.autoAdvance, options.intervalMs, hovered]);
+
+  if (sorted.length === 0) return null;
+  const banner = sorted[index];
+  const isFull = size === "full";
+
+  return (
+    <div
+      className={`relative ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto"} overflow-hidden ${CINEMATIC_HEIGHT_CLASSES[size]}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Background slides with Ken Burns effect */}
+      {sorted.map((b, i) => (
+        <div
+          key={b._id}
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+            i === index ? "opacity-100 z-10" : "opacity-0 z-0"
+          }`}
+        >
+          <img
+            src={b.imageUrl}
+            alt={b.title}
+            className="w-full h-full object-cover"
+            style={options.kenBurnsEffect ? {
+              animation: `kenBurns ${options.intervalMs * 1.2}ms ease-in-out infinite`,
+            } : undefined}
+          />
+        </div>
+      ))}
+
+      {/* Cinematic gradient overlays */}
+      <div className="absolute inset-0 z-20 bg-gradient-to-t from-black via-black/30 to-transparent" />
+      <div className="absolute inset-0 z-20 bg-gradient-to-r from-black/60 via-transparent to-black/60" />
+
+      {/* Glassmorphism info card */}
+      <div className="absolute bottom-8 md:bottom-12 left-6 md:left-12 right-6 md:right-auto z-30 max-w-xl">
+        <div
+          className="group/card bg-white/[0.07] backdrop-blur-xl border border-white/[0.12] rounded-2xl p-5 md:p-8 transition-all duration-500 hover:bg-white/[0.12] hover:border-white/[0.2] hover:translate-y-[-4px]"
+          style={{ animation: "cinematicSlideUp 600ms ease-out" }}
+          key={banner._id}
+        >
+          <h2 className="text-xl md:text-3xl font-semibold text-white tracking-tight leading-tight mb-2">
+            {banner.title}
+          </h2>
+          {banner.subtitle && (
+            <p className="text-sm md:text-base text-gray-300/90 leading-relaxed mb-4 line-clamp-2 group-hover/card:line-clamp-none transition-all duration-300">
+              {banner.subtitle}
+            </p>
+          )}
+          {bannerHref(banner) && (
+            <a
+              href={bannerHref(banner)}
+              className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-sm font-medium px-5 py-2.5 rounded-full transition-all duration-300 hover:gap-3"
+            >
+              View Details
+              <ChevronRight className="w-4 h-4" />
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      {options.showProgressBar && sorted.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 z-30 h-1 bg-white/10">
+          <div
+            key={progressKey}
+            className="h-full bg-gradient-to-r from-white/60 via-white to-white/60 rounded-full"
+            style={{
+              animation: hovered
+                ? "none"
+                : `cinematicProgress ${options.intervalMs}ms linear`,
+              width: hovered ? undefined : undefined,
+            }}
+          />
+        </div>
+      )}
+
+      {/* Slide indicators */}
+      {sorted.length > 1 && (
+        <div className="absolute bottom-8 md:bottom-12 right-6 md:right-12 z-30 flex items-center gap-2">
+          {sorted.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => { setIndex(i); setProgressKey((k) => k + 1); }}
+              aria-label={`Go to banner ${i + 1}`}
+              className={`rounded-full transition-all duration-500 ${
+                i === index
+                  ? "w-8 h-2 bg-white"
+                  : "w-2 h-2 bg-white/30 hover:bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProductCinematic({
+  products,
+  options,
+  size,
+}: {
+  products: Product[];
+  options: ProductTemplateOptions["cinematic"];
+  size: ProductTemplateSize;
+}) {
+  const { formatPrice } = useCurrency();
+  const [index, setIndex] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const [progressKey, setProgressKey] = useState(0);
+
+  useEffect(() => {
+    setIndex((i) => (products.length === 0 ? 0 : i % products.length));
+  }, [products.length]);
+
+  useEffect(() => {
+    if (!options.autoAdvance || hovered) return;
+    if (products.length <= 1) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % products.length);
+      setProgressKey((k) => k + 1);
+    }, options.intervalMs);
+    return () => clearInterval(id);
+  }, [products.length, options.autoAdvance, options.intervalMs, hovered]);
+
+  if (products.length === 0) return null;
+  const product = products[index];
+  const imgSrc = product.imageUrl || product.images?.[0];
+  const onSale = !!product.discountPercent && product.discountPercent > 0;
+  const displayPrice = onSale ? product.effectivePrice ?? product.price : product.price;
+  const isFull = size === "full";
+
+  return (
+    <div
+      className={`relative ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto"} overflow-hidden ${CINEMATIC_HEIGHT_CLASSES[size]}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Background slides with Ken Burns effect */}
+      {products.map((p, i) => {
+        const src = p.imageUrl || p.images?.[0];
+        return (
+          <div
+            key={p._id}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              i === index ? "opacity-100 z-10" : "opacity-0 z-0"
+            }`}
+          >
+            {src ? (
+              <img
+                src={src}
+                alt={p.name}
+                className="w-full h-full object-cover"
+                style={options.kenBurnsEffect ? {
+                  animation: `kenBurns ${options.intervalMs * 1.2}ms ease-in-out infinite`,
+                } : undefined}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#111113] to-[#1a1a1d] flex items-center justify-center">
+                <ImageOff className="w-16 h-16 text-gray-700" />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Cinematic gradient overlays */}
+      <div className="absolute inset-0 z-20 bg-gradient-to-t from-black via-black/30 to-transparent" />
+      <div className="absolute inset-0 z-20 bg-gradient-to-r from-black/60 via-transparent to-black/60" />
+
+      {/* Glassmorphism product info card */}
+      <div className="absolute bottom-8 md:bottom-12 left-6 md:left-12 right-6 md:right-auto z-30 max-w-xl">
+        <a
+          href={productHref(product)}
+          className="group/card block bg-white/[0.07] backdrop-blur-xl border border-white/[0.12] rounded-2xl p-5 md:p-8 transition-all duration-500 hover:bg-white/[0.12] hover:border-white/[0.2] hover:translate-y-[-4px]"
+          style={{ animation: "cinematicSlideUp 600ms ease-out" }}
+          key={product._id}
+        >
+          {/* Category badge */}
+          <span className="inline-block text-[11px] font-medium text-gray-400 bg-white/5 border border-white/10 rounded-full px-3 py-1 mb-3">
+            {product.category}
+          </span>
+
+          <h2 className="text-xl md:text-3xl font-semibold text-white tracking-tight leading-tight mb-2">
+            {product.name}
+          </h2>
+
+          {/* Price */}
+          <div className="flex items-center gap-3 mb-4">
+            {onSale ? (
+              <>
+                <span className="text-lg md:text-xl font-semibold text-emerald-400">{formatPrice(displayPrice)}</span>
+                <span className="text-sm text-gray-500 line-through">{formatPrice(product.price)}</span>
+                <span className="text-[11px] font-semibold text-black bg-emerald-400 rounded-full px-2.5 py-0.5">
+                  -{product.discountPercent}%
+                </span>
+              </>
+            ) : (
+              <span className="text-lg md:text-xl font-semibold text-white">{formatPrice(product.price)}</span>
+            )}
+          </div>
+
+          {/* Description preview — reveals on card hover */}
+          {product.description && (
+            <p className="text-sm text-gray-300/80 leading-relaxed mb-4 line-clamp-0 max-h-0 overflow-hidden group-hover/card:line-clamp-2 group-hover/card:max-h-20 transition-all duration-500">
+              {product.description}
+            </p>
+          )}
+
+          <span className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-sm font-medium px-5 py-2.5 rounded-full transition-all duration-300 group-hover/card:gap-3">
+            View Product
+            <ChevronRight className="w-4 h-4 transition-transform duration-300 group-hover/card:translate-x-0.5" />
+          </span>
+        </a>
+      </div>
+
+      {/* Progress bar */}
+      {options.showProgressBar && products.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 z-30 h-1 bg-white/10">
+          <div
+            key={progressKey}
+            className="h-full bg-gradient-to-r from-white/60 via-white to-white/60 rounded-full"
+            style={{
+              animation: hovered
+                ? "none"
+                : `cinematicProgress ${options.intervalMs}ms linear`,
+            }}
+          />
+        </div>
+      )}
+
+      {/* Slide indicators */}
+      {products.length > 1 && (
+        <div className="absolute bottom-8 md:bottom-12 right-6 md:right-12 z-30 flex items-center gap-2">
+          {products.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => { setIndex(i); setProgressKey((k) => k + 1); }}
+              aria-label={`Go to product ${i + 1}`}
+              className={`rounded-full transition-all duration-500 ${
+                i === index
+                  ? "w-8 h-2 bg-white"
+                  : "w-2 h-2 bg-white/30 hover:bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

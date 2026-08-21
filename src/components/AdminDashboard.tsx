@@ -126,7 +126,7 @@ interface BannerFormValues {
   templateIds: string[];
 }
 
-type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
+type BannerLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee" | "cinematic";
 type BannerPosition = "top" | "above-grid" | "bottom" | "sidebar";
 // How prominent the banner block is on screen — shared by every layout, each
 // mapping the same four steps to its own height/width scale.
@@ -166,6 +166,12 @@ interface BannerTemplateOptions {
     direction: "left" | "right";
     pauseOnHover: boolean;
   };
+  cinematic: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showProgressBar: boolean;
+    kenBurnsEffect: boolean;
+  };
 }
 
 interface BannerTemplate {
@@ -189,7 +195,7 @@ interface BannerTemplateFormValues {
   options: BannerTemplateOptions;
 }
 
-type ProductTemplateLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee";
+type ProductTemplateLayout = "carousel" | "grid" | "spotlight" | "sidebar" | "showcase" | "bento" | "marquee" | "cinematic";
 type ProductTemplatePosition = "top" | "above-grid" | "bottom" | "sidebar";
 type ProductTemplateSize = "small" | "medium" | "large" | "full";
 
@@ -225,6 +231,12 @@ interface ProductTemplateOptions {
     speed: "slow" | "normal" | "fast";
     direction: "left" | "right";
     pauseOnHover: boolean;
+  };
+  cinematic: {
+    autoAdvance: boolean;
+    intervalMs: number;
+    showProgressBar: boolean;
+    kenBurnsEffect: boolean;
   };
 }
 
@@ -307,6 +319,12 @@ const SIZE_DIMENSIONS: Record<BannerLayout, Record<BannerSize, string>> = {
     large: "Cards ~320×192px – 420×256px",
     full: "Cards ~384×224px – 480×288px",
   },
+  cinematic: {
+    small: "Immersive layout, 300–420px tall",
+    medium: "Immersive layout, 400–560px tall",
+    large: "Immersive layout, 500–680px tall",
+    full: "Immersive layout, 85–92% of screen height",
+  },
 };
 
 const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
@@ -317,6 +335,7 @@ const DEFAULT_TEMPLATE_OPTIONS: BannerTemplateOptions = {
   showcase: { autoAdvance: true, intervalMs: 5000, showArrows: true },
   bento: { featuredCount: 1, showSubtitle: true },
   marquee: { speed: "normal", direction: "left", pauseOnHover: true },
+  cinematic: { autoAdvance: true, intervalMs: 6000, showProgressBar: true, kenBurnsEffect: true },
 };
 
 // Same four-step scale and pixel ranges as SIZE_DIMENSIONS above — kept in
@@ -364,6 +383,12 @@ const PRODUCT_SIZE_DIMENSIONS: Record<ProductTemplateLayout, Record<ProductTempl
     large: "Cards ~320×192px – 420×256px",
     full: "Cards ~384×224px – 480×288px",
   },
+  cinematic: {
+    small: "Immersive layout, 300–420px tall",
+    medium: "Immersive layout, 400–560px tall",
+    large: "Immersive layout, 500–680px tall",
+    full: "Immersive layout, 85–92% of screen height",
+  },
 };
 
 const DEFAULT_PRODUCT_TEMPLATE_OPTIONS: ProductTemplateOptions = {
@@ -374,6 +399,7 @@ const DEFAULT_PRODUCT_TEMPLATE_OPTIONS: ProductTemplateOptions = {
   showcase: { autoAdvance: true, intervalMs: 5000, showArrows: true },
   bento: { featuredCount: 1 },
   marquee: { speed: "normal", direction: "left", pauseOnHover: true },
+  cinematic: { autoAdvance: true, intervalMs: 6000, showProgressBar: true, kenBurnsEffect: true },
 };
 
 type DiscountType = "percentage" | "fixed";
@@ -1184,6 +1210,8 @@ function ProductTemplateForm({
     setOptions((prev) => ({ ...prev, bento: { ...prev.bento, ...patch } }));
   const updateMarquee = (patch: Partial<ProductTemplateOptions["marquee"]>) =>
     setOptions((prev) => ({ ...prev, marquee: { ...prev.marquee, ...patch } }));
+  const updateCinematic = (patch: Partial<ProductTemplateOptions["cinematic"]>) =>
+    setOptions((prev) => ({ ...prev, cinematic: { ...prev.cinematic, ...patch } }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1564,6 +1592,57 @@ function ProductTemplateForm({
             />
             <span className="text-sm text-gray-300">Pause on hover</span>
           </label>
+        </div>
+      )}
+
+      {layout === "cinematic" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Premium immersive layout with Ken Burns zoom, glassmorphism cards, and fade transitions.
+          </p>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Transition interval</label>
+            <div className="flex items-center gap-2">
+              <ClampedNumberInput
+                value={options.cinematic.intervalMs / 1000}
+                min={3}
+                max={15}
+                fallback={6}
+                onCommit={(s) => updateCinematic({ intervalMs: s * 1000 })}
+                className="w-16 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/30"
+              />
+              <span className="text-sm text-gray-500">seconds</span>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.cinematic.autoAdvance}
+                onChange={(e) => updateCinematic({ autoAdvance: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Auto-advance to next product</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.cinematic.showProgressBar}
+                onChange={(e) => updateCinematic({ showProgressBar: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Show progress bar</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.cinematic.kenBurnsEffect}
+                onChange={(e) => updateCinematic({ kenBurnsEffect: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Enable Ken Burns (zoom & pan) effect on background</span>
+            </label>
+          </div>
         </div>
       )}
 
@@ -2114,6 +2193,7 @@ const LAYOUT_TEMPLATES: { id: BannerLayout; label: string; description: string }
   { id: "showcase", label: "Showcase", description: "A row with two large banners in the center and smaller ones peeking at each side." },
   { id: "bento", label: "Bento", description: "Modern asymmetric grid — one or two large featured tiles with smaller ones filling in around them." },
   { id: "marquee", label: "Marquee", description: "All banners in one continuous, auto-scrolling strip." },
+  { id: "cinematic", label: "Cinematic", description: "Premium immersive layout with Ken Burns zoom, glassmorphism cards, and fade transitions." },
 ];
 
 function LayoutPreview({ layout }: { layout: BannerLayout }) {
@@ -2214,6 +2294,11 @@ const PRODUCT_LAYOUT_TEMPLATES: { id: ProductTemplateLayout; label: string; desc
     id: "marquee",
     label: "Marquee",
     description: "All tagged products in one continuous, auto-scrolling strip.",
+  },
+  {
+    id: "cinematic",
+    label: "Cinematic",
+    description: "Premium immersive layout with Ken Burns zoom, glassmorphism cards, and fade transitions.",
   },
 ];
 
@@ -2322,6 +2407,8 @@ function BannerTemplateForm({
     setOptions((prev) => ({ ...prev, bento: { ...prev.bento, ...patch } }));
   const updateMarquee = (patch: Partial<BannerTemplateOptions["marquee"]>) =>
     setOptions((prev) => ({ ...prev, marquee: { ...prev.marquee, ...patch } }));
+  const updateCinematic = (patch: Partial<BannerTemplateOptions["cinematic"]>) =>
+    setOptions((prev) => ({ ...prev, cinematic: { ...prev.cinematic, ...patch } }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2677,6 +2764,57 @@ function BannerTemplateForm({
             />
             <span className="text-sm text-gray-300">Pause on hover</span>
           </label>
+        </div>
+      )}
+
+      {layout === "cinematic" && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600">
+            Premium immersive layout with Ken Burns zoom, glassmorphism cards, and fade transitions.
+          </p>
+          <div className="max-w-xs">
+            <label className="text-xs text-gray-500 mb-1.5 block">Transition interval</label>
+            <div className="flex items-center gap-2">
+              <ClampedNumberInput
+                value={options.cinematic.intervalMs / 1000}
+                min={3}
+                max={15}
+                fallback={6}
+                onCommit={(s) => updateCinematic({ intervalMs: s * 1000 })}
+                className="w-16 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/30"
+              />
+              <span className="text-sm text-gray-500">seconds</span>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.cinematic.autoAdvance}
+                onChange={(e) => updateCinematic({ autoAdvance: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Auto-advance to next banner</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.cinematic.showProgressBar}
+                onChange={(e) => updateCinematic({ showProgressBar: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Show progress bar</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={options.cinematic.kenBurnsEffect}
+                onChange={(e) => updateCinematic({ kenBurnsEffect: e.target.checked })}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Enable Ken Burns (zoom & pan) effect on background</span>
+            </label>
+          </div>
         </div>
       )}
 
