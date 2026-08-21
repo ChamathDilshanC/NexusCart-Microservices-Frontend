@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Sparkles,
   Info,
+  LayoutGrid,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -59,6 +60,7 @@ interface Product {
   effectivePrice?: number;
   discountPercent?: number;
   promotionName?: string | null;
+  templateIds?: string[];
 }
 
 interface OrderItem {
@@ -111,6 +113,7 @@ interface ProductFormValues {
   imageUrl: string;
   images: string[];
   isFeatured: boolean;
+  templateIds: string[];
 }
 
 interface BannerFormValues {
@@ -185,6 +188,27 @@ interface BannerTemplateFormValues {
   isActive: boolean;
   order: number;
   options: BannerTemplateOptions;
+}
+
+type ProductTemplatePosition = "top" | "above-grid" | "bottom";
+
+interface ProductTemplate {
+  _id: string;
+  name: string;
+  position: ProductTemplatePosition;
+  autoAdvance: boolean;
+  intervalMs: number;
+  isActive: boolean;
+  order: number;
+}
+
+interface ProductTemplateFormValues {
+  name: string;
+  position: ProductTemplatePosition;
+  autoAdvance: boolean;
+  intervalMs: number;
+  isActive: boolean;
+  order: number;
 }
 
 const SIZE_OPTIONS: { value: BannerSize; label: string }[] = [
@@ -596,7 +620,7 @@ function CategoryPicker({
         className={inputClass}
       />
       {open && filtered.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-[#1a1a1c] py-1 shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-64 overflow-y-auto scrollbar-hide rounded-xl border border-white/10 bg-[#1a1a1c] py-1 shadow-xl">
           {filtered.map((cat) => (
             <div key={cat} className="flex items-center gap-1 px-2 py-1 hover:bg-white/5">
               <button
@@ -647,6 +671,7 @@ function ProductForm({
   initial,
   categories,
   categoryCounts,
+  productTemplates,
   submitting,
   onCancel,
   onSubmit,
@@ -656,6 +681,7 @@ function ProductForm({
   initial: Product | null;
   categories: string[];
   categoryCounts: Record<string, number>;
+  productTemplates: ProductTemplate[];
   submitting: boolean;
   onCancel: () => void;
   onSubmit: (values: ProductFormValues) => void;
@@ -671,6 +697,11 @@ function ProductForm({
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [isFeatured, setIsFeatured] = useState(initial?.isFeatured ?? false);
+  const [templateIds, setTemplateIds] = useState<string[]>(initial?.templateIds ?? []);
+
+  const toggleTemplate = (id: string) => {
+    setTemplateIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -683,6 +714,7 @@ function ProductForm({
       imageUrl: imageUrl.trim(),
       images: images.map((i) => i.trim()).filter((i) => i.length > 0),
       isFeatured,
+      templateIds,
     });
   };
 
@@ -728,7 +760,7 @@ function ProductForm({
         <div>
           <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
             Price
-            <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-gray-300">
+            <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
               {selectedCurrency}
             </span>
           </label>
@@ -799,6 +831,30 @@ function ProductForm({
         />
         <span className="text-sm text-gray-300">Featured product</span>
       </label>
+
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Show in product templates</label>
+        {productTemplates.length === 0 ? (
+          <p className="text-xs text-gray-600">
+            No product templates yet — create one above and it&apos;ll appear here.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-4">
+            {productTemplates.map((tpl) => (
+              <label key={tpl._id} className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={templateIds.includes(tpl._id)}
+                  onChange={() => toggleTemplate(tpl._id)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+                />
+                <span className="text-sm text-gray-300">{tpl.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-600 mt-1.5">Leave all unchecked to hide this product from every template.</p>
+      </div>
 
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className={secondaryButtonClass}>
@@ -976,24 +1032,272 @@ function BannerForm({
   );
 }
 
+/* ---------------------------------- Product template form ---------------------------------- */
+
+const PRODUCT_TEMPLATE_POSITION_OPTIONS: { value: ProductTemplatePosition; label: string }[] = [
+  { value: "top", label: "Top of page" },
+  { value: "above-grid", label: "Above products" },
+  { value: "bottom", label: "Bottom of page" },
+];
+
+function ProductTemplateForm({
+  initial,
+  submitting,
+  onCancel,
+  onSubmit,
+}: {
+  initial: ProductTemplate | null;
+  submitting: boolean;
+  onCancel: () => void;
+  onSubmit: (values: ProductTemplateFormValues) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [position, setPosition] = useState<ProductTemplatePosition>(initial?.position ?? "top");
+  const [order, setOrder] = useState(initial ? String(initial.order) : "0");
+  const [autoAdvance, setAutoAdvance] = useState(initial?.autoAdvance ?? true);
+  const [intervalMs, setIntervalMs] = useState(initial?.intervalMs ?? 5000);
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  const toast = useToast();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Template name is required");
+      return;
+    }
+    onSubmit({
+      name: name.trim(),
+      position,
+      order: Number.parseInt(order, 10) || 0,
+      autoAdvance,
+      intervalMs,
+      isActive,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Template name</label>
+        <input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. New Arrivals"
+          className={inputClass}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Position on shop page</label>
+          <SegmentedControl value={position} onChange={setPosition} options={PRODUCT_TEMPLATE_POSITION_OPTIONS} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Order within position</label>
+          <input
+            type="number"
+            step="1"
+            value={order}
+            onChange={(e) => setOrder(e.target.value)}
+            placeholder="0"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={autoAdvance}
+            onChange={(e) => setAutoAdvance(e.target.checked)}
+            className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+          />
+          <span className="text-sm text-gray-300">Auto-advance</span>
+        </label>
+        <div className="max-w-xs">
+          <label className="text-xs text-gray-500 mb-1.5 block">Interval (seconds)</label>
+          <ClampedNumberInput
+            min={2}
+            max={10}
+            fallback={5}
+            value={Math.round(intervalMs / 1000)}
+            onCommit={(seconds) => setIntervalMs(seconds * 1000)}
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={isActive}
+          onChange={(e) => setIsActive(e.target.checked)}
+          className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+        />
+        <span className="text-sm text-gray-300">Active</span>
+      </label>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel} className={secondaryButtonClass}>
+          Cancel
+        </button>
+        <button type="submit" disabled={submitting} className={primaryButtonClass}>
+          {submitting ? "Saving…" : initial ? "Save changes" : "Create template"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ProductTemplatesSection({
+  templates,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: {
+  templates: ProductTemplate[];
+  onCreate: (values: ProductTemplateFormValues) => Promise<void>;
+  onUpdate: (id: string, values: ProductTemplateFormValues) => Promise<void>;
+  onDelete: (template: ProductTemplate) => Promise<void>;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<ProductTemplate | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const openCreate = () => {
+    setEditing(null);
+    setShowForm(true);
+  };
+  const openEdit = (template: ProductTemplate) => {
+    setEditing(template);
+    setShowForm(true);
+  };
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+  };
+
+  const handleSubmit = async (values: ProductTemplateFormValues) => {
+    setSubmitting(true);
+    try {
+      if (editing) {
+        await onUpdate(editing._id, values);
+      } else {
+        await onCreate(values);
+      }
+      closeForm();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const POSITION_LABELS: Record<ProductTemplatePosition, string> = {
+    top: "Top of page",
+    "above-grid": "Above products",
+    bottom: "Bottom of page",
+  };
+
+  return (
+    <div className={cardClass}>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-sm font-semibold text-white">Product templates</h3>
+        <button onClick={openCreate} className={`${primaryButtonClass} flex items-center gap-2 !px-4 !py-2 text-xs`}>
+          <Plus className="w-3.5 h-3.5" /> Add template
+        </button>
+      </div>
+      <p className="text-xs text-gray-500 mb-4">
+        An auto-rotating 2-row grid of tagged products. Every active template renders on the shop page at its own position.
+      </p>
+
+      {templates.length === 0 ? (
+        <EmptyState message="No product templates yet. Add one, then tag products into it from the product form." />
+      ) : (
+        <div className="space-y-3">
+          {templates.map((tpl) => (
+            <div
+              key={tpl._id}
+              className="flex items-center gap-4 bg-[#0a0a0b] border border-white/10 rounded-xl p-4"
+            >
+              <div className="h-10 w-10 shrink-0 rounded-lg bg-white/5 grid place-items-center">
+                <LayoutGrid className="w-4 h-4 text-gray-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-white truncate">{tpl.name}</h4>
+                  <span
+                    className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      tpl.isActive
+                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                        : "bg-white/5 text-gray-500 border-white/10"
+                    }`}
+                  >
+                    {tpl.isActive ? "Live" : "Hidden"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {POSITION_LABELS[tpl.position]}
+                  {tpl.autoAdvance ? ` · Every ${Math.round(tpl.intervalMs / 1000)}s` : " · Auto-advance off"} · Order{" "}
+                  {tpl.order}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => openEdit(tpl)}
+                  aria-label="Edit template"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onDelete(tpl)}
+                  aria-label="Delete template"
+                  className="text-red-400 hover:text-red-300 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <Modal title={editing ? "Edit template" : "Add template"} onClose={closeForm}>
+          <ProductTemplateForm initial={editing} submitting={submitting} onCancel={closeForm} onSubmit={handleSubmit} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 /* ---------------------------------- Products tab ---------------------------------- */
 
 function ProductsSection({
   products,
   categories,
+  productTemplates,
   onCreate,
   onUpdate,
   onDelete,
   onRenameCategory,
   onDeleteCategory,
+  onCreateProductTemplate,
+  onUpdateProductTemplate,
+  onDeleteProductTemplate,
 }: {
   products: Product[];
   categories: string[];
+  productTemplates: ProductTemplate[];
   onCreate: (values: ProductFormValues) => Promise<void>;
   onUpdate: (id: string, values: ProductFormValues) => Promise<void>;
   onDelete: (product: Product) => Promise<void>;
   onRenameCategory: (oldName: string, newName: string) => Promise<void>;
   onDeleteCategory: (name: string) => Promise<void>;
+  onCreateProductTemplate: (values: ProductTemplateFormValues) => Promise<void>;
+  onUpdateProductTemplate: (id: string, values: ProductTemplateFormValues) => Promise<void>;
+  onDeleteProductTemplate: (template: ProductTemplate) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -1042,6 +1346,13 @@ function ProductsSection({
 
   return (
     <div className="space-y-6">
+      <ProductTemplatesSection
+        templates={productTemplates}
+        onCreate={onCreateProductTemplate}
+        onUpdate={onUpdateProductTemplate}
+        onDelete={onDeleteProductTemplate}
+      />
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h2 className="text-sm text-gray-500">
           {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""}
@@ -1132,6 +1443,7 @@ function ProductsSection({
             initial={editing}
             categories={categories}
             categoryCounts={categoryCounts}
+            productTemplates={productTemplates}
             submitting={submitting}
             onCancel={closeForm}
             onSubmit={handleSubmit}
@@ -2560,6 +2872,7 @@ export function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [productTemplates, setProductTemplates] = useState<ProductTemplate[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>([]);
@@ -2584,6 +2897,10 @@ export function AdminDashboard() {
   const fetchCategories = useCallback(async () => {
     const data = await apiFetch<string[]>("/products/categories");
     setCategories(data);
+  }, []);
+  const fetchProductTemplates = useCallback(async () => {
+    const data = await apiFetch<ProductTemplate[]>("/admin/product-templates");
+    setProductTemplates(data);
   }, []);
   const fetchOrders = useCallback(async () => {
     const data = await apiFetch<Order[]>("/admin/orders");
@@ -2616,6 +2933,7 @@ export function AdminDashboard() {
           fetchUsers(),
           fetchProducts(),
           fetchCategories(),
+          fetchProductTemplates(),
           fetchOrders(),
           fetchBanners(),
           fetchBannerTemplates(),
@@ -2687,6 +3005,37 @@ export function AdminDashboard() {
       await Promise.all([fetchProducts(), fetchCategories()]);
     } catch (err) {
       toast.error(errorMessage(err, "Failed to delete category"));
+    }
+  };
+
+  const handleCreateProductTemplate = async (values: ProductTemplateFormValues) => {
+    try {
+      await apiFetch("/admin/product-templates", { method: "POST", body: values });
+      toast.success("Product template created");
+      await fetchProductTemplates();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to create product template"));
+    }
+  };
+
+  const handleUpdateProductTemplate = async (id: string, values: ProductTemplateFormValues) => {
+    try {
+      await apiFetch(`/admin/product-templates/${id}`, { method: "PUT", body: values });
+      toast.success("Product template updated");
+      await fetchProductTemplates();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to update product template"));
+    }
+  };
+
+  const handleDeleteProductTemplate = async (template: ProductTemplate) => {
+    if (!window.confirm(`Delete "${template.name}"? Products tagged to it will be untagged.`)) return;
+    try {
+      await apiFetch(`/admin/product-templates/${template._id}`, { method: "DELETE" });
+      toast.success("Product template deleted");
+      await Promise.all([fetchProductTemplates(), fetchProducts()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to delete product template"));
     }
   };
 
@@ -2887,11 +3236,15 @@ export function AdminDashboard() {
             <ProductsSection
               products={products}
               categories={categories}
+              productTemplates={productTemplates}
               onCreate={handleCreateProduct}
               onUpdate={handleUpdateProduct}
               onDelete={handleDeleteProduct}
               onRenameCategory={handleRenameCategory}
               onDeleteCategory={handleDeleteCategory}
+              onCreateProductTemplate={handleCreateProductTemplate}
+              onUpdateProductTemplate={handleUpdateProductTemplate}
+              onDeleteProductTemplate={handleDeleteProductTemplate}
             />
           )}
           {activeTab === "orders" && (

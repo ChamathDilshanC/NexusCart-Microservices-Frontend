@@ -29,6 +29,16 @@
     -webkit-appearance: none;
     margin: 0;
   }
+
+  /* Reusable on any scrollable element that should stay scrollable without
+     showing a visible scrollbar track (e.g. dropdown lists). */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes marquee {

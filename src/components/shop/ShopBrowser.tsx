@@ -104,6 +104,18 @@ interface BannerTemplate {
   options: BannerTemplateOptions;
 }
 
+type ProductTemplatePosition = "top" | "above-grid" | "bottom";
+
+interface ProductTemplate {
+  _id: string;
+  name: string;
+  position: ProductTemplatePosition;
+  autoAdvance: boolean;
+  intervalMs: number;
+  isActive: boolean;
+  order: number;
+}
+
 // Every layout maps the same four size steps to whatever "bigger" means for
 // its own shape — a taller carousel, a wider grid, a bigger rail, etc.
 function resolveSize(template: BannerTemplate): BannerSize {
@@ -170,6 +182,8 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>([]);
+  const [productTemplates, setProductTemplates] = useState<ProductTemplate[]>([]);
+  const [templatedProducts, setTemplatedProducts] = useState<Record<string, Product[]>>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [serverTotalPages, setServerTotalPages] = useState(1);
@@ -218,23 +232,27 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     const catsKey = "/products/categories";
     const bnrsKey = "/products/banners";
     const tplsKey = "/products/banner-templates";
+    const ptplsKey = "/products/product-templates";
 
     const cachedCats = getCached<string[]>(catsKey);
     if (cachedCats) setCategories(cachedCats);
     if (alwaysFlat) {
       const cachedBnrs = getCached<Banner[]>(bnrsKey);
       const cachedTpls = getCached<BannerTemplate[]>(tplsKey);
+      const cachedPtpls = getCached<ProductTemplate[]>(ptplsKey);
       if (cachedBnrs) setBanners(cachedBnrs);
       if (cachedTpls) setBannerTemplates(cachedTpls);
+      if (cachedPtpls) setProductTemplates(cachedPtpls);
     }
 
     (async () => {
       try {
         if (alwaysFlat) {
-          const [cats, bnrs, tpls] = await Promise.all([
+          const [cats, bnrs, tpls, ptpls] = await Promise.all([
             apiFetch<string[]>(catsKey, { auth: false }),
             apiFetch<Banner[]>(bnrsKey, { auth: false }),
             apiFetch<BannerTemplate[]>(tplsKey, { auth: false }).catch(() => []),
+            apiFetch<ProductTemplate[]>(ptplsKey, { auth: false }).catch(() => []),
           ]);
           setCategories(cats);
           setCached(catsKey, cats);
@@ -242,6 +260,8 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
           setCached(bnrsKey, bnrs);
           setBannerTemplates(tpls);
           setCached(tplsKey, tpls);
+          setProductTemplates(ptpls);
+          setCached(ptplsKey, ptpls);
         } else {
           const cats = await apiFetch<string[]>(catsKey, { auth: false });
           setCategories(cats);
@@ -252,6 +272,41 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
       }
     })();
   }, [alwaysFlat]);
+
+  // One products fetch per active product template, so the rotator always
+  // has its full tagged pool regardless of whatever search/category/page
+  // filters the main catalog fetch currently has applied.
+  useEffect(() => {
+    if (!alwaysFlat) return;
+    const active = productTemplates.filter((tpl) => tpl.isActive);
+    if (active.length === 0) return;
+
+    const cachedEntries: Record<string, Product[]> = {};
+    for (const tpl of active) {
+      const key = `/products?templateId=${tpl._id}`;
+      const cached = getCached<Product[]>(key);
+      if (cached) cachedEntries[tpl._id] = cached;
+    }
+    if (Object.keys(cachedEntries).length > 0) {
+      setTemplatedProducts((prev) => ({ ...prev, ...cachedEntries }));
+    }
+
+    (async () => {
+      const results = await Promise.all(
+        active.map(async (tpl) => {
+          const key = `/products?templateId=${tpl._id}`;
+          try {
+            const data = await apiFetch<Product[]>(key, { auth: false });
+            setCached(key, data);
+            return [tpl._id, data] as const;
+          } catch {
+            return [tpl._id, []] as const;
+          }
+        })
+      );
+      setTemplatedProducts((prev) => ({ ...prev, ...Object.fromEntries(results) }));
+    })();
+  }, [alwaysFlat, productTemplates]);
 
   // Debounced product fetch on search/category/sort/page change. When no
   // search/category filter is active (and alwaysFlat is off) we fetch the
@@ -348,7 +403,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   const bannersForTemplate = (template: BannerTemplate) =>
     banners.filter((b) => !b.templateIds || b.templateIds.length === 0 || b.templateIds.includes(template._id));
 
-  const getBlocksForPosition = (position: BannerPosition) => {
+  const getBannerBlocksForPosition = (position: BannerPosition) => {
     const list = templatesByPosition[position];
     if (!list || list.length === 0) return [];
     return list
@@ -359,14 +414,47 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
       .filter((b): b is { tpl: BannerTemplate; tplBanners: Banner[] } => b !== null);
   };
 
-  const renderTemplateGroup = (position: BannerPosition) => {
-    const blocks = getBlocksForPosition(position);
+  // Product templates never target "sidebar" (an 8-item grid doesn't fit the
+  // narrow rail), so this only ever needs to handle the three wide positions.
+  const getProductTemplateBlocksForPosition = (position: ProductTemplatePosition) =>
+    productTemplates
+      .filter((tpl) => tpl.isActive && tpl.position === position)
+      .map((tpl) => {
+        const tplProducts = templatedProducts[tpl._id] ?? [];
+        return tplProducts.length > 0 ? { tpl, tplProducts } : null;
+      })
+      .filter((b): b is { tpl: ProductTemplate; tplProducts: Product[] } => b !== null);
+
+  type PositionBlock =
+    | { kind: "banner"; order: number; tpl: BannerTemplate; tplBanners: Banner[] }
+    | { kind: "productTemplate"; order: number; tpl: ProductTemplate; tplProducts: Product[] };
+
+  // Banner templates and product templates share the same position slots and
+  // both use `order` to sequence themselves within a slot, so they interleave
+  // by that shared order rather than banners always rendering first — e.g. a
+  // product rotator can sit between two banner blocks at the same position.
+  const renderTemplateGroup = (position: ProductTemplatePosition) => {
+    const bannerBlocks: PositionBlock[] = getBannerBlocksForPosition(position).map((b) => ({
+      kind: "banner",
+      order: b.tpl.order,
+      ...b,
+    }));
+    const productBlocks: PositionBlock[] = getProductTemplateBlocksForPosition(position).map((b) => ({
+      kind: "productTemplate",
+      order: b.tpl.order,
+      ...b,
+    }));
+    const blocks = [...bannerBlocks, ...productBlocks].sort((a, b) => a.order - b.order);
     if (blocks.length === 0) return null;
     return (
       <div className="flex flex-col gap-4">
-        {blocks.map(({ tpl, tplBanners }) => (
-          <BannerBlock key={tpl._id} template={tpl} banners={tplBanners} />
-        ))}
+        {blocks.map((block) =>
+          block.kind === "banner" ? (
+            <BannerBlock key={`banner-${block.tpl._id}`} template={block.tpl} banners={block.tplBanners} />
+          ) : (
+            <ProductTemplateBlock key={`product-${block.tpl._id}`} template={block.tpl} products={block.tplProducts} />
+          )
+        )}
       </div>
     );
   };
@@ -374,7 +462,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   const topSection = renderTemplateGroup("top");
   const aboveGridSection = renderTemplateGroup("above-grid");
   const bottomSection = renderTemplateGroup("bottom");
-  const sidebarBlocks = getBlocksForPosition("sidebar");
+  const sidebarBlocks = getBannerBlocksForPosition("sidebar");
 
   const onSaleProducts = useMemo(
     () => products.filter((p) => p.discountPercent && p.discountPercent > 0).slice(0, 8),
@@ -725,6 +813,54 @@ function BannerBlock({ template, banners }: { template: BannerTemplate; banners:
     return <BannerMarquee banners={banners} options={template.options.marquee} size={size} />;
   }
   return <BannerCarousel banners={banners} options={template.options.carousel} size={size} />;
+}
+
+/* ---------------------------- Product template block ---------------------------- */
+
+function chunkIntoPages<T>(items: T[], size: number): T[][] {
+  const pages: T[][] = [];
+  for (let i = 0; i < items.length; i += size) pages.push(items.slice(i, i + size));
+  return pages;
+}
+
+// A fixed 2-row grid of tagged products that auto-slides to the next set on
+// an admin-configured interval — the product-catalog counterpart to
+// BannerCarousel, but paging whole grids instead of cross-fading single slides.
+function ProductTemplateBlock({ template, products }: { template: ProductTemplate; products: Product[] }) {
+  const pages = useMemo(() => chunkIntoPages(products, SECTION_SIZE), [products]);
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    setPage((p) => (pages.length === 0 ? 0 : p % pages.length));
+  }, [pages.length]);
+
+  useEffect(() => {
+    if (!template.autoAdvance) return;
+    if (pages.length <= 1) return;
+    const id = setInterval(() => setPage((p) => (p + 1) % pages.length), template.intervalMs);
+    return () => clearInterval(id);
+  }, [pages.length, template.autoAdvance, template.intervalMs]);
+
+  if (pages.length === 0) return null;
+
+  return (
+    <div className="max-w-[1600px] mx-auto px-6 py-8">
+      <div className="overflow-hidden">
+        <div
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{ transform: `translateX(-${page * 100}%)` }}
+        >
+          {pages.map((pageProducts, i) => (
+            <div key={i} className="shrink-0 w-full grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {pageProducts.map((p) => (
+                <ProductCard key={p._id} product={p} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ---------------------------- Banner showcase ---------------------------- */
