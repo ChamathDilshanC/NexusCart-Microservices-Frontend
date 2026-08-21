@@ -21,7 +21,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <GoeyToaster position="bottom-right" />
+      <GoeyToaster position="bottom-right" theme="dark" />
     </ToastContext.Provider>
   );
 }

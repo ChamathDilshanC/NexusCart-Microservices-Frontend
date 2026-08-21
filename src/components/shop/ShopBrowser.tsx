@@ -2192,11 +2192,12 @@ function BannerCinematic({
   const isFull = size === "full";
 
   return (
-    <div
-      className={`relative ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto"} overflow-hidden ${CINEMATIC_HEIGHT_CLASSES[size]}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className={`w-full ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto px-4 md:px-6 my-8"}`}>
+      <div
+        className={`relative w-full overflow-hidden ${isFull ? "" : "rounded-2xl md:rounded-3xl border border-white/5 shadow-2xl"} ${CINEMATIC_HEIGHT_CLASSES[size]}`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
       {/* Background slides with Ken Burns effect */}
       {sorted.map((b, i) => (
         <div
@@ -2280,6 +2281,7 @@ function BannerCinematic({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -2320,11 +2322,12 @@ function ProductCinematic({
   const isFull = size === "full";
 
   return (
-    <div
-      className={`relative ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto"} overflow-hidden ${CINEMATIC_HEIGHT_CLASSES[size]}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className={`w-full ${BANNER_CONTAINER_WIDTH[size]} ${isFull ? "" : "mx-auto px-4 md:px-6 my-8"}`}>
+      <div
+        className={`relative w-full overflow-hidden ${isFull ? "" : "rounded-2xl md:rounded-3xl border border-white/5 shadow-2xl"} ${CINEMATIC_HEIGHT_CLASSES[size]}`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
       {/* Background slides with Ken Burns effect */}
       {products.map((p, i) => {
         const src = p.imageUrl || p.images?.[0];
@@ -2435,6 +2438,7 @@ function ProductCinematic({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
