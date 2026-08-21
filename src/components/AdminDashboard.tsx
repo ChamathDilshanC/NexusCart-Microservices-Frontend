@@ -237,6 +237,7 @@ interface ProductTemplate {
   isActive: boolean;
   order: number;
   applyToAllProducts: boolean;
+  isDefaultGrid: boolean;
   options: ProductTemplateOptions;
 }
 
@@ -248,6 +249,7 @@ interface ProductTemplateFormValues {
   isActive: boolean;
   order: number;
   applyToAllProducts: boolean;
+  isDefaultGrid: boolean;
   options: ProductTemplateOptions;
 }
 
@@ -1164,6 +1166,7 @@ function ProductTemplateForm({
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [order, setOrder] = useState(initial ? String(initial.order) : "0");
   const [applyToAllProducts, setApplyToAllProducts] = useState(initial?.applyToAllProducts ?? false);
+  const [isDefaultGrid, setIsDefaultGrid] = useState(initial?.isDefaultGrid ?? false);
   const [options, setOptions] = useState<ProductTemplateOptions>(initial?.options ?? DEFAULT_PRODUCT_TEMPLATE_OPTIONS);
   const toast = useToast();
 
@@ -1196,6 +1199,7 @@ function ProductTemplateForm({
       isActive,
       order: Number.parseInt(order, 10) || 0,
       applyToAllProducts,
+      isDefaultGrid: layout === "grid" && isDefaultGrid,
       options,
     });
   };
@@ -1401,6 +1405,22 @@ function ProductTemplateForm({
               />
             </div>
           )}
+          <div className="border-t border-white/10 pt-4">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isDefaultGrid}
+                onChange={(e) => setIsDefaultGrid(e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+              />
+              <span className="text-sm text-gray-300">Use as the main shop grid</span>
+            </label>
+            <p className="text-xs text-gray-600 mt-1.5">
+              Replaces the default columns/page-size on the /shop catalog grid with this template&apos;s
+              Columns × Rows. Only one template can be the default at a time — checking this unchecks it on
+              any other template.
+            </p>
+          </div>
         </div>
       )}
 
@@ -1673,6 +1693,11 @@ function ProductTemplatesSection({
                     >
                       {tpl.isActive ? "Live" : "Hidden"}
                     </span>
+                    {tpl.isDefaultGrid && (
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-300 border-blue-500/20">
+                        Default grid
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1 truncate">
                     {PRODUCT_LAYOUT_TEMPLATES.find((l) => l.id === tpl.layout)?.label ?? tpl.layout} ·{" "}

@@ -152,6 +152,7 @@ interface ProductTemplate {
   isActive: boolean;
   order: number;
   applyToAllProducts: boolean;
+  isDefaultGrid: boolean;
   options: ProductTemplateOptions;
 }
 
@@ -367,6 +368,28 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     })();
   }, [alwaysFlat, productTemplates]);
 
+  // A product template marked "Use as the main shop grid" (grid layout
+  // only) governs the catalog's columns and page size (columns x rows)
+  // instead of the built-in defaults below — it only reshapes the grid,
+  // never which products appear; search/filter/sort/pagination are
+  // untouched. Falls back to today's fixed 12-per-page / 2-3-4 columns
+  // when no such template exists (or it's inactive).
+  const defaultGridTemplate = useMemo(
+    () => productTemplates.find((t) => t.isActive && t.isDefaultGrid && t.layout === "grid"),
+    [productTemplates]
+  );
+  const catalogPageSize = defaultGridTemplate
+    ? defaultGridTemplate.options.grid.columns * defaultGridTemplate.options.grid.rows
+    : PAGE_SIZE;
+  // Keeps the exact original literal when no default-grid template is set,
+  // rather than routing the fallback through GRID_COLUMN_CLASSES (whose
+  // 2/3/4 steps use a different breakpoint scale than this page's original
+  // fixed classes) — so nothing visually changes for a store that never
+  // configures this.
+  const catalogGridClass = defaultGridTemplate
+    ? `grid-cols-1 ${GRID_COLUMN_CLASSES[defaultGridTemplate.options.grid.columns] ?? GRID_COLUMN_CLASSES[3]}`
+    : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+
   // Debounced product fetch on search/category/sort/page change. When no
   // search/category filter is active (and alwaysFlat is off) we fetch the
   // whole (sorted) catalog once and group it by category client-side;
@@ -380,7 +403,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     params.set("sort", sort);
     if (isFlatMode) {
       params.set("page", String(currentPage));
-      params.set("limit", String(PAGE_SIZE));
+      params.set("limit", String(catalogPageSize));
     }
     const url = `/products?${params.toString()}`;
 
@@ -431,7 +454,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     }, 300);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, selectedCategories.join(","), sort, isFlatMode, currentPage]);
+  }, [search, selectedCategories.join(","), sort, isFlatMode, currentPage, catalogPageSize]);
 
   // Reset to page 1 whenever any filter changes.
   useEffect(() => {
@@ -789,8 +812,8 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
 
           <section className="lg:col-span-3">
             {loading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+              <div className={`grid ${catalogGridClass} gap-4`}>
+                {Array.from({ length: catalogPageSize }).map((_, i) => (
                   <div key={i} className="aspect-[3/4] rounded-2xl bg-white/5 animate-pulse" />
                 ))}
               </div>
@@ -811,7 +834,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <div className={`grid ${catalogGridClass} gap-4`}>
                     {filteredProducts.map((p) => (
                       <ProductCard key={p._id} product={p} />
                     ))}
@@ -844,7 +867,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className={`grid ${catalogGridClass} gap-4`}>
                       {items.slice(0, SECTION_SIZE).map((p) => (
                         <ProductCard key={p._id} product={p} />
                       ))}
