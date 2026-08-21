@@ -114,6 +114,7 @@ interface ProductTemplate {
   intervalMs: number;
   isActive: boolean;
   order: number;
+  applyToAllProducts: boolean;
 }
 
 // Every layout maps the same four size steps to whatever "bigger" means for
@@ -281,10 +282,14 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     const active = productTemplates.filter((tpl) => tpl.isActive);
     if (active.length === 0) return;
 
+    // "Apply to all products" pulls the whole catalog instead of filtering
+    // by the tag on Product.templateIds.
+    const keyFor = (tpl: ProductTemplate) =>
+      tpl.applyToAllProducts ? "/products" : `/products?templateId=${tpl._id}`;
+
     const cachedEntries: Record<string, Product[]> = {};
     for (const tpl of active) {
-      const key = `/products?templateId=${tpl._id}`;
-      const cached = getCached<Product[]>(key);
+      const cached = getCached<Product[]>(keyFor(tpl));
       if (cached) cachedEntries[tpl._id] = cached;
     }
     if (Object.keys(cachedEntries).length > 0) {
@@ -294,7 +299,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     (async () => {
       const results = await Promise.all(
         active.map(async (tpl) => {
-          const key = `/products?templateId=${tpl._id}`;
+          const key = keyFor(tpl);
           try {
             const data = await apiFetch<Product[]>(key, { auth: false });
             setCached(key, data);

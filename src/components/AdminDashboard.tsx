@@ -200,6 +200,7 @@ interface ProductTemplate {
   intervalMs: number;
   isActive: boolean;
   order: number;
+  applyToAllProducts: boolean;
 }
 
 interface ProductTemplateFormValues {
@@ -209,6 +210,7 @@ interface ProductTemplateFormValues {
   intervalMs: number;
   isActive: boolean;
   order: number;
+  applyToAllProducts: boolean;
 }
 
 const SIZE_OPTIONS: { value: BannerSize; label: string }[] = [
@@ -841,14 +843,23 @@ function ProductForm({
         ) : (
           <div className="flex flex-wrap gap-4">
             {productTemplates.map((tpl) => (
-              <label key={tpl._id} className="flex items-center gap-2 cursor-pointer select-none">
+              <label
+                key={tpl._id}
+                className={`flex items-center gap-2 select-none ${
+                  tpl.applyToAllProducts ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
                 <input
                   type="checkbox"
-                  checked={templateIds.includes(tpl._id)}
+                  checked={tpl.applyToAllProducts || templateIds.includes(tpl._id)}
+                  disabled={tpl.applyToAllProducts}
                   onChange={() => toggleTemplate(tpl._id)}
-                  className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 />
-                <span className="text-sm text-gray-300">{tpl.name}</span>
+                <span className={`text-sm ${tpl.applyToAllProducts ? "text-gray-500" : "text-gray-300"}`}>
+                  {tpl.name}
+                  {tpl.applyToAllProducts && " (all products)"}
+                </span>
               </label>
             ))}
           </div>
@@ -1057,6 +1068,7 @@ function ProductTemplateForm({
   const [autoAdvance, setAutoAdvance] = useState(initial?.autoAdvance ?? true);
   const [intervalMs, setIntervalMs] = useState(initial?.intervalMs ?? 5000);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  const [applyToAllProducts, setApplyToAllProducts] = useState(initial?.applyToAllProducts ?? false);
   const toast = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1072,6 +1084,7 @@ function ProductTemplateForm({
       autoAdvance,
       intervalMs,
       isActive,
+      applyToAllProducts,
     });
   };
 
@@ -1086,6 +1099,21 @@ function ProductTemplateForm({
           placeholder="e.g. New Arrivals"
           className={inputClass}
         />
+      </div>
+
+      <div>
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={applyToAllProducts}
+            onChange={(e) => setApplyToAllProducts(e.target.checked)}
+            className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+          />
+          <span className="text-sm text-gray-300">Apply to all products</span>
+        </label>
+        <p className="text-xs text-gray-600 mt-1.5">
+          Shows every product in the catalog instead of only ones tagged to this template below.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1239,7 +1267,7 @@ function ProductTemplatesSection({
                 <p className="text-xs text-gray-500 mt-1 truncate">
                   {POSITION_LABELS[tpl.position]}
                   {tpl.autoAdvance ? ` · Every ${Math.round(tpl.intervalMs / 1000)}s` : " · Auto-advance off"} · Order{" "}
-                  {tpl.order}
+                  {tpl.order} · {tpl.applyToAllProducts ? "All products" : "Tagged products"}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
