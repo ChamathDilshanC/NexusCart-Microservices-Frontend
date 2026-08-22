@@ -202,6 +202,7 @@ type Availability = "in_stock" | "out_of_stock";
 
 const PAGE_SIZE = 12;
 const SECTION_SIZE = 8;
+const CATEGORY_VISIBLE_COUNT = 10;
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "newest", label: "Newest" },
@@ -256,6 +257,12 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [serverTotal, setServerTotal] = useState(0);
+  // Flat-mode grid starts collapsed to ~2 rows; "Load more" reveals the rest
+  // of the current page in animated batches instead of dumping everything
+  // in at once. Reset to the collapsed count whenever the page's contents
+  // change so a fresh page (or a changed filter) always starts collapsed.
+  const [flatVisibleCount, setFlatVisibleCount] = useState(SECTION_SIZE);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
@@ -473,6 +480,12 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     setCurrentPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, selectedCategories.join(","), sort, priceMin, priceMax, availability.join(",")]);
+
+  // Collapse the flat grid back to ~2 rows whenever a new page loads or a
+  // filter changes the underlying product set.
+  useEffect(() => {
+    setFlatVisibleCount(SECTION_SIZE);
+  }, [search, selectedCategories.join(","), sort, priceMin, priceMax, availability.join(","), currentPage]);
 
   // Active templates grouped by where they render on the page; every active
   // template renders simultaneously, each showing only its own tagged banners
@@ -802,7 +815,7 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-2">Category</label>
                   <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
-                    {categories.map((cat) => (
+                    {(categoriesExpanded ? categories : categories.slice(0, CATEGORY_VISIBLE_COUNT)).map((cat) => (
                       <label
                         key={cat}
                         className="flex items-center gap-2.5 text-sm text-gray-300 cursor-pointer"
@@ -817,6 +830,14 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
                       </label>
                     ))}
                   </div>
+                  {categories.length > CATEGORY_VISIBLE_COUNT && (
+                    <button
+                      onClick={() => setCategoriesExpanded((v) => !v)}
+                      className="mt-2 text-xs font-medium text-gray-400 hover:text-white transition-colors"
+                    >
+                      {categoriesExpanded ? "Show less" : `Show all (${categories.length})`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -847,13 +868,31 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
               ) : (
                 <>
                   <div className={`grid ${catalogGridClass} gap-4`}>
-                    {filteredProducts.map((p) => (
-                      <ProductCard key={p._id} product={p} />
+                    {filteredProducts.slice(0, flatVisibleCount).map((p, idx) => (
+                      <div
+                        key={p._id}
+                        className={idx >= SECTION_SIZE ? "animate-[gridCardReveal_420ms_ease-out_both]" : undefined}
+                        style={idx >= SECTION_SIZE ? { animationDelay: `${(idx % SECTION_SIZE) * 40}ms` } : undefined}
+                      >
+                        <ProductCard product={p} />
+                      </div>
                     ))}
                   </div>
 
-                  {totalPages > 1 && (
-                    <Pagination currentPage={safePage} totalPages={totalPages} onChange={setCurrentPage} />
+                  {flatVisibleCount < filteredProducts.length ? (
+                    <div className="flex justify-center mt-8">
+                      <button
+                        onClick={() => setFlatVisibleCount((c) => c + SECTION_SIZE)}
+                        className="group flex items-center gap-2 bg-white hover:bg-gray-200 text-black text-sm font-medium px-7 py-3.5 rounded-full transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] hover:shadow-[0_8px_30px_rgba(255,255,255,0.15)] cursor-pointer"
+                      >
+                        Load more
+                        <ChevronRight className="w-4 h-4 rotate-90 transition-transform duration-200 group-hover:translate-y-0.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    totalPages > 1 && (
+                      <Pagination currentPage={safePage} totalPages={totalPages} onChange={setCurrentPage} />
+                    )
                   )}
                 </>
               )
