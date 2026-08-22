@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MapPin, CreditCard, Truck, Wallet, AlertCircle, RefreshCw, Loader2, ImageOff } from "lucide-react";
-import PhoneInput, { type Country } from "react-phone-number-input";
+import PhoneInput, { type Country, getCountries, getCountryCallingCode } from "react-phone-number-input";
 import phoneInputFlags from "react-phone-number-input/flags";
 import phoneInputCountryNames from "react-phone-number-input/locale/en.json";
 import "react-phone-number-input/style.css";
@@ -51,6 +51,17 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: React.ReactN
   { value: "Cash on Delivery", label: "Cash on Delivery", icon: <Truck className="w-4 h-4" /> },
   { value: "Digital Wallet", label: "Digital Wallet", icon: <Wallet className="w-4 h-4" /> },
 ];
+
+// react-phone-number-input's country dropdown only labels each option with
+// the country name by default — no calling code, so there's no way to tell
+// countries with similar names apart, or confirm you picked the right one,
+// until after you've already selected it. Appending "(+code)" to every
+// label fixes that; computed once at module load since it never changes.
+const PHONE_INPUT_LABELS: Record<string, string> = { ...phoneInputCountryNames };
+for (const country of getCountries()) {
+  const name = (phoneInputCountryNames as Record<string, string>)[country];
+  if (name) PHONE_INPUT_LABELS[country] = `${name} (+${getCountryCallingCode(country)})`;
+}
 
 /* -------------------------------- Page -------------------------------- */
 
@@ -248,6 +259,7 @@ export default function CheckoutPage() {
                       international
                       defaultCountry="LK"
                       flags={phoneInputFlags}
+                      labels={PHONE_INPUT_LABELS}
                       value={phone}
                       onChange={setPhone}
                       onCountryChange={(selectedCountry?: Country) => {
