@@ -62,6 +62,7 @@ export default function CheckoutPage() {
   const [state, setState] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [country, setCountry] = useState("United States");
+  const [phone, setPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Credit / Debit Card");
 
   const [submitting, setSubmitting] = useState(false);
@@ -102,7 +103,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     setFormError("");
 
-    if (!street.trim() || !city.trim() || !state.trim() || !zipCode.trim() || !country.trim()) {
+    if (!street.trim() || !city.trim() || !state.trim() || !zipCode.trim() || !country.trim() || !phone.trim()) {
       setFormError("Please fill in all shipping fields.");
       return;
     }
@@ -131,6 +132,7 @@ export default function CheckoutPage() {
           shippingAddress,
           customerEmail: currentUser?.email,
           customerName: currentUser?.name,
+          customerPhone: phone.trim(),
         },
       });
 
@@ -230,6 +232,18 @@ export default function CheckoutPage() {
                       onChange={(e) => setStreet(e.target.value)}
                       disabled={!!order}
                       placeholder="123 Main St"
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors w-full disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-2">Phone number</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      disabled={!!order}
+                      placeholder="+1 555 123 4567"
                       className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors w-full disabled:opacity-50"
                     />
                   </div>

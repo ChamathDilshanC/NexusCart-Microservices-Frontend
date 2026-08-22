@@ -85,6 +85,7 @@ interface Order {
   _id: string;
   customerEmail?: string;
   customerName?: string;
+  customerPhone?: string;
   items: OrderItem[];
   totalAmount: number;
   shippingAddress?: ShippingAddress;
@@ -2045,6 +2046,7 @@ function OrdersSection({
   const newCount = orders.filter((o) => o.status === "PENDING").length;
 
   const query = searchQuery.trim().toLowerCase();
+  const queryDigits = query.replace(/\D/g, "");
   const filteredOrders = query
     ? orders.filter((order) => {
         const shortId = order._id.slice(-8).toLowerCase();
@@ -2052,7 +2054,11 @@ function OrdersSection({
           order._id.toLowerCase().includes(query) ||
           shortId.includes(query) ||
           (order.customerName || "").toLowerCase().includes(query) ||
-          (order.customerEmail || "").toLowerCase().includes(query)
+          (order.customerEmail || "").toLowerCase().includes(query) ||
+          (order.customerPhone || "").toLowerCase().includes(query) ||
+          // Phone numbers get typed with varying spacing/dashes/country codes —
+          // also compare digits-only so "5551234567" matches "+1 555-123-4567".
+          (queryDigits.length > 0 && (order.customerPhone || "").replace(/\D/g, "").includes(queryDigits))
         );
       })
     : orders;
@@ -2085,7 +2091,7 @@ function OrdersSection({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by order number or customer name..."
+          placeholder="Search by order number, customer name, or phone..."
           className="w-full bg-[#111113] border border-white/10 rounded-xl pl-11 pr-10 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors"
         />
         {searchQuery && (
@@ -2137,6 +2143,7 @@ function OrdersSection({
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {order.customerName ? `${order.customerName} · ` : ""}
+                      {order.customerPhone ? `${order.customerPhone} · ` : ""}
                       {formatDate(order.createdAt)}
                     </div>
                   </div>
