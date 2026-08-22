@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Package,
@@ -25,6 +25,7 @@ import {
   Bell,
   UserPlus,
   ShieldCheck,
+  KeyRound,
   PackagePlus,
   ArrowUpCircle,
   ArrowDownCircle,
@@ -40,6 +41,14 @@ import { useAppState } from "@/components/providers/AppStateProvider";
 // SUPER_ADMIN_EMAIL in backend/.env.
 const SUPER_ADMIN_EMAIL = "chamathdilshan.dev@gmail.com";
 
+const ADMIN_PERMISSIONS: { value: AdminPermission; label: string }[] = [
+  { value: "products", label: "Products" },
+  { value: "orders", label: "Orders" },
+  { value: "banners", label: "Banners" },
+  { value: "promotions", label: "Promotions" },
+  { value: "settings", label: "Settings" },
+];
+
 /* ---------------------------------- Types ---------------------------------- */
 
 type TabId = "products" | "orders" | "users" | "banners" | "promotions" | "notifications" | "settings";
@@ -52,11 +61,14 @@ interface Metrics {
   totalRevenue: number;
 }
 
+type AdminPermission = "products" | "orders" | "banners" | "promotions" | "settings";
+
 interface AdminUser {
   _id: string;
   name: string;
   email: string;
   role: "Customer" | "Admin";
+  permissions?: AdminPermission[];
 }
 
 interface StockMovement {
@@ -477,15 +489,24 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   CANCELLED: "bg-red-500/10 text-red-300 border-red-500/20",
 };
 
-const TABS: { id: TabId; label: string; icon: IconType }[] = [
-  { id: "products", label: "Products", icon: Package },
-  { id: "orders", label: "Orders", icon: ShoppingBag },
+// requiredPermission: undefined means every Admin can see the tab
+// (Users tab isn't gated by a section permission — see admin.routes.ts).
+const TABS: { id: TabId; label: string; icon: IconType; requiredPermission?: AdminPermission }[] = [
+  { id: "products", label: "Products", icon: Package, requiredPermission: "products" },
+  { id: "orders", label: "Orders", icon: ShoppingBag, requiredPermission: "orders" },
   { id: "users", label: "Users", icon: Users },
-  { id: "banners", label: "Banners", icon: ImagePlus },
-  { id: "promotions", label: "Promotions", icon: Percent },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "settings", label: "Settings", icon: SettingsIcon },
+  { id: "banners", label: "Banners", icon: ImagePlus, requiredPermission: "banners" },
+  { id: "promotions", label: "Promotions", icon: Percent, requiredPermission: "promotions" },
+  { id: "notifications", label: "Notifications", icon: Bell, requiredPermission: "orders" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, requiredPermission: "settings" },
 ];
+
+function canAccessTab(tab: { requiredPermission?: AdminPermission }, user: SessionUser | null): boolean {
+  if (!tab.requiredPermission) return true;
+  if (!user) return false;
+  if (user.email === SUPER_ADMIN_EMAIL) return true;
+  return !!user.permissions?.includes(tab.requiredPermission);
+}
 
 /* ---------------------------------- Helpers ---------------------------------- */
 
@@ -2429,15 +2450,18 @@ function UsersSection({
   currentUser,
   onCreate,
   onUpdateRole,
+  onUpdatePermissions,
   onDelete,
 }: {
   users: AdminUser[];
   currentUser: SessionUser | null;
   onCreate: (values: { name: string; email: string; password: string; role: "Customer" | "Admin" }) => Promise<void>;
   onUpdateRole: (user: AdminUser, role: "Customer" | "Admin") => Promise<void>;
+  onUpdatePermissions: (user: AdminUser, permissions: AdminPermission[]) => Promise<void>;
   onDelete: (user: AdminUser) => Promise<void>;
 }) {
   const [showCreate, setShowCreate] = useState(false);
+  const [editingPermissionsFor, setEditingPermissionsFor] = useState<string | null>(null);
   const canManageAdmins = currentUser?.email === SUPER_ADMIN_EMAIL;
   // This tab is for admin-account management, not a customer directory —
   // the regular customer base can be large and isn't relevant here.
@@ -2466,6 +2490,9 @@ function UsersSection({
             const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
             // Only the super admin can touch another Admin account.
             const canManageThisUser = !isSelf && !isSuperAdmin && canManageAdmins;
+            // Unlike role, section permissions can be set by any admin —
+            // shaping another admin's access doesn't require super-admin.
+            const canEditPermissions = !isSelf && !isSuperAdmin;
             return (
               <div key={user._id} className="flex items-center gap-4 bg-[#111113] border border-white/10 rounded-2xl p-4">
                 <div className="h-10 w-10 shrink-0 rounded-full bg-white/10 grid place-items-center text-sm font-semibold text-white">
@@ -2507,6 +2534,25 @@ function UsersSection({
                   >
                     {user.role}
                   </span>
+                )}
+
+                {canEditPermissions && (
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setEditingPermissionsFor(editingPermissionsFor === user._id ? null : user._id)}
+                      aria-label={`Edit ${user.name}'s permissions`}
+                      className="text-gray-500 hover:text-white transition-colors"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                    </button>
+                    {editingPermissionsFor === user._id && (
+                      <PermissionsPopover
+                        user={user}
+                        onClose={() => setEditingPermissionsFor(null)}
+                        onSave={(permissions) => onUpdatePermissions(user, permissions)}
+                      />
+                    )}
+                  </div>
                 )}
 
                 {canManageThisUser && (
@@ -2605,6 +2651,88 @@ function CreateUserModal({
         </button>
       </form>
     </Modal>
+  );
+}
+
+function PermissionsPopover({
+  user,
+  onClose,
+  onSave,
+}: {
+  user: AdminUser;
+  onClose: () => void;
+  onSave: (permissions: AdminPermission[]) => Promise<void>;
+}) {
+  const [selected, setSelected] = useState<Set<AdminPermission>>(new Set(user.permissions ?? []));
+  const [saving, setSaving] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) onClose();
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggle = (perm: AdminPermission) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(perm)) next.delete(perm);
+      else next.add(perm);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(Array.from(selected));
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute right-0 top-full mt-2 z-50 w-56 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl p-3"
+    >
+      <p className="text-xs text-gray-500 mb-2">{user.name}&apos;s access</p>
+      <div className="space-y-1.5 mb-3">
+        {ADMIN_PERMISSIONS.map((perm) => (
+          <label
+            key={perm.value}
+            className="flex items-center gap-2.5 text-sm text-gray-200 cursor-pointer select-none"
+          >
+            <input
+              type="checkbox"
+              checked={selected.has(perm.value)}
+              onChange={() => toggle(perm.value)}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 accent-white cursor-pointer"
+            />
+            {perm.label}
+          </label>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saving}
+        className="w-full bg-white hover:bg-gray-200 text-black text-xs font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
+      >
+        {saving ? "Saving..." : "Save"}
+      </button>
+    </div>
   );
 }
 
@@ -3936,6 +4064,19 @@ export function AdminDashboard() {
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
   const [viewedOrderIds, setViewedOrderIds] = useState<Set<string>>(new Set());
 
+  const visibleTabs = useMemo(() => TABS.filter((tab) => canAccessTab(tab, currentUser)), [currentUser]);
+
+  // The default tab (Products) isn't accessible to every admin now that
+  // sections are permission-gated — once we know who's logged in, bounce to
+  // the first tab they actually have.
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!visibleTabs.some((tab) => tab.id === activeTab) && visibleTabs.length > 0) {
+      setActiveTab(visibleTabs[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, visibleTabs]);
+
   // Load which order notifications have already been viewed, so they stay
   // dismissed from the Notifications tab across reloads. Loaded in an
   // effect (not a useState initializer) to avoid an SSR/hydration mismatch.
@@ -4069,6 +4210,16 @@ export function AdminDashboard() {
       await fetchUsers();
     } catch (err) {
       toast.error(errorMessage(err, "Failed to update role"));
+    }
+  };
+
+  const handleUpdateUserPermissions = async (user: AdminUser, permissions: AdminPermission[]) => {
+    try {
+      await apiFetch(`/admin/users/${user._id}/permissions`, { method: "PATCH", body: { permissions } });
+      toast.success(`${user.name}'s access updated`);
+      await fetchUsers();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to update permissions"));
     }
   };
 
@@ -4374,7 +4525,7 @@ export function AdminDashboard() {
           </div>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            {TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
               const badgeCount =
@@ -4437,6 +4588,7 @@ export function AdminDashboard() {
               currentUser={currentUser}
               onCreate={handleCreateUser}
               onUpdateRole={handleUpdateUserRole}
+              onUpdatePermissions={handleUpdateUserPermissions}
               onDelete={handleDeleteUser}
             />
           )}

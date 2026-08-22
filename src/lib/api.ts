@@ -1,11 +1,14 @@
 const TOKEN_KEY = "nexus_token";
 const USER_KEY = "nexus_user";
 
+export type AdminPermission = "products" | "orders" | "banners" | "promotions" | "settings";
+
 export interface SessionUser {
   id: string;
   email: string;
   name: string;
   role: "Customer" | "Admin";
+  permissions?: AdminPermission[];
 }
 
 export function getToken(): string | null {
