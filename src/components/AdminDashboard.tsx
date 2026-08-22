@@ -2019,6 +2019,7 @@ function OrdersSection({
 }) {
   const [updating, setUpdating] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { formatPrice } = useCurrency();
 
   const handleChange = async (order: Order, status: OrderStatus) => {
@@ -2045,6 +2046,19 @@ function OrdersSection({
 
   const newCount = orders.filter((o) => o.status === "PENDING").length;
 
+  const query = searchQuery.trim().toLowerCase();
+  const filteredOrders = query
+    ? orders.filter((order) => {
+        const shortId = order._id.slice(-8).toLowerCase();
+        return (
+          order._id.toLowerCase().includes(query) ||
+          shortId.includes(query) ||
+          (order.customerName || "").toLowerCase().includes(query) ||
+          (order.customerEmail || "").toLowerCase().includes(query)
+        );
+      })
+    : orders;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -2067,11 +2081,33 @@ function OrdersSection({
         </button>
       </div>
 
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by order number or customer name..."
+          className="w-full bg-[#111113] border border-white/10 rounded-xl pl-11 pr-10 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {orders.length === 0 ? (
         <EmptyState message="No orders yet." />
+      ) : filteredOrders.length === 0 ? (
+        <EmptyState message={`No orders match "${searchQuery}".`} />
       ) : (
         <div className="space-y-3">
-          {orders.map((order) => {
+          {filteredOrders.map((order) => {
             const address = formatAddress(order.shippingAddress);
             const isUpdating = updating.has(order._id);
             const isNew = order.status === "PENDING";
@@ -2101,7 +2137,10 @@ function OrdersSection({
                         <Receipt className="w-3.5 h-3.5" /> Invoice
                       </Link>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">{formatDate(order.createdAt)}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {order.customerName ? `${order.customerName} · ` : ""}
+                      {formatDate(order.createdAt)}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium text-white">{formatPrice(order.totalAmount)}</div>
