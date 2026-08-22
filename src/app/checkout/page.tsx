@@ -53,7 +53,7 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: React.ReactN
 export default function CheckoutPage() {
   const router = useRouter();
   const toast = useToast();
-  const { formatPrice } = useCurrency();
+  const { formatPrice, selectedCurrency, exchangeRate } = useCurrency();
   const { items, subtotal, clear } = useCart();
   const { currentUser, isAuthInitialized } = useAppState();
 
@@ -133,6 +133,8 @@ export default function CheckoutPage() {
           customerEmail: currentUser?.email,
           customerName: currentUser?.name,
           customerPhone: phone.trim(),
+          currency: selectedCurrency,
+          exchangeRate,
         },
       });
 

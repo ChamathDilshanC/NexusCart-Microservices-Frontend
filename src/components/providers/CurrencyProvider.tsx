@@ -23,6 +23,8 @@ interface CurrencyContextValue {
   setSelectedCurrency: (code: string) => void;
   /** Converts and formats an amount that's denominated in the store's base currency. */
   formatPrice: (amount: number) => string;
+  /** The raw multiplier formatPrice uses internally (selectedCurrency rate / baseCurrency rate) — for callers (e.g. checkout) that need to send it to the backend alongside the order, so later displays (emails, invoices) can convert consistently instead of only working in the browser. */
+  exchangeRate: number;
 }
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
@@ -61,11 +63,15 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, code);
   };
 
+  const exchangeRate = useMemo(() => {
+    const baseRate = rates.rates[rates.base] ?? 1;
+    const targetRate = rates.rates[selectedCurrency] ?? baseRate;
+    return targetRate / baseRate;
+  }, [rates, selectedCurrency]);
+
   const formatPrice = useMemo(() => {
     return (amount: number) => {
-      const baseRate = rates.rates[rates.base] ?? 1;
-      const targetRate = rates.rates[selectedCurrency] ?? baseRate;
-      const converted = amount * (targetRate / baseRate);
+      const converted = amount * exchangeRate;
       try {
         return new Intl.NumberFormat(undefined, {
           style: "currency",
@@ -76,7 +82,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         return `${selectedCurrency} ${converted.toFixed(2)}`;
       }
     };
-  }, [rates, selectedCurrency]);
+  }, [exchangeRate, selectedCurrency]);
 
   const value: CurrencyContextValue = {
     baseCurrency: settings.baseCurrency,
@@ -84,6 +90,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     supportedCurrencies: settings.supportedCurrencies,
     setSelectedCurrency,
     formatPrice,
+    exchangeRate,
   };
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
