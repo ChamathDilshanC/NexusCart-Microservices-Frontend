@@ -257,11 +257,12 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [serverTotal, setServerTotal] = useState(0);
-  // Flat-mode grid starts collapsed to ~2 rows; "Load more" reveals the rest
-  // of the current page in animated batches instead of dumping everything
-  // in at once. Reset to the collapsed count whenever the page's contents
-  // change so a fresh page (or a changed filter) always starts collapsed.
-  const [flatVisibleCount, setFlatVisibleCount] = useState(SECTION_SIZE);
+  // Flat-mode grid shows 2 rows at a time and auto-advances through the
+  // current page's products on a timer, sliding the old set out to the left
+  // — same carousel mechanic as ProductGrid below, just driven off
+  // filteredProducts instead of a template's own product pool.
+  const [carouselStep, setCarouselStep] = useState(0);
+  const [carouselHovered, setCarouselHovered] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -481,10 +482,10 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, selectedCategories.join(","), sort, priceMin, priceMax, availability.join(",")]);
 
-  // Collapse the flat grid back to ~2 rows whenever a new page loads or a
-  // filter changes the underlying product set.
+  // Restart the flat-grid carousel at its first step whenever a new page
+  // loads or a filter changes the underlying product set.
   useEffect(() => {
-    setFlatVisibleCount(SECTION_SIZE);
+    setCarouselStep(0);
   }, [search, selectedCategories.join(","), sort, priceMin, priceMax, availability.join(","), currentPage]);
 
   // Active templates grouped by where they render on the page; every active
@@ -605,6 +606,21 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
 
   const totalPages = isFlatMode ? serverTotalPages : 1;
   const safePage = Math.min(currentPage, totalPages);
+
+  // Flat-grid carousel: the current server page's products chunked into
+  // 2-row batches, auto-advancing every 5s and looping back to the start —
+  // separate from Pagination below, which moves to the next *server* page.
+  const CAROUSEL_INTERVAL_MS = 5000;
+  const carouselPages = useMemo(
+    () => chunkIntoPages(filteredProducts, SECTION_SIZE),
+    [filteredProducts]
+  );
+  useEffect(() => {
+    if (carouselPages.length <= 1 || carouselHovered) return;
+    const id = setInterval(() => setCarouselStep((s) => s + 1), CAROUSEL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [carouselPages.length, carouselHovered]);
+  const carouselIndex = carouselPages.length === 0 ? 0 : mod(carouselStep, carouselPages.length);
 
   // Default (no filter) view on /shop/allitems: the same fetched catalog,
   // split into one section per category so each can show a preview + a
@@ -867,32 +883,44 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
                 </div>
               ) : (
                 <>
-                  <div className={`grid ${catalogGridClass} gap-4`}>
-                    {filteredProducts.slice(0, flatVisibleCount).map((p, idx) => (
-                      <div
-                        key={p._id}
-                        className={idx >= SECTION_SIZE ? "animate-[gridCardReveal_420ms_ease-out_both]" : undefined}
-                        style={idx >= SECTION_SIZE ? { animationDelay: `${(idx % SECTION_SIZE) * 40}ms` } : undefined}
-                      >
-                        <ProductCard product={p} />
-                      </div>
-                    ))}
+                  <div
+                    className="overflow-hidden"
+                    onMouseEnter={() => setCarouselHovered(true)}
+                    onMouseLeave={() => setCarouselHovered(false)}
+                  >
+                    {/* items-start keeps each batch sized to its own content — see the
+                        matching note on ProductGrid below for why. */}
+                    <div
+                      className="flex items-start transition-transform duration-700 ease-in-out"
+                      style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+                    >
+                      {carouselPages.map((pageProducts, i) => (
+                        <div key={i} className={`shrink-0 w-full grid ${catalogGridClass} gap-4`}>
+                          {pageProducts.map((p) => (
+                            <ProductCard key={p._id} product={p} />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  {flatVisibleCount < filteredProducts.length ? (
-                    <div className="flex justify-center mt-8">
-                      <button
-                        onClick={() => setFlatVisibleCount((c) => c + SECTION_SIZE)}
-                        className="group flex items-center gap-2 bg-white hover:bg-gray-200 text-black text-sm font-medium px-7 py-3.5 rounded-full transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] hover:shadow-[0_8px_30px_rgba(255,255,255,0.15)] cursor-pointer"
-                      >
-                        Load more
-                        <ChevronRight className="w-4 h-4 rotate-90 transition-transform duration-200 group-hover:translate-y-0.5" />
-                      </button>
+                  {carouselPages.length > 1 && (
+                    <div className="flex items-center justify-center gap-1.5 mt-6">
+                      {carouselPages.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setCarouselStep(i)}
+                          aria-label={`Go to set ${i + 1}`}
+                          className={`h-1.5 rounded-full transition-all ${
+                            i === carouselIndex ? "w-6 bg-white" : "w-1.5 bg-white/20 hover:bg-white/40"
+                          }`}
+                        />
+                      ))}
                     </div>
-                  ) : (
-                    totalPages > 1 && (
-                      <Pagination currentPage={safePage} totalPages={totalPages} onChange={setCurrentPage} />
-                    )
+                  )}
+
+                  {totalPages > 1 && (
+                    <Pagination currentPage={safePage} totalPages={totalPages} onChange={setCurrentPage} />
                   )}
                 </>
               )

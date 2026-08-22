@@ -90,15 +90,3 @@
     transform: translateY(0);
   }
 }
-
-/* Shop grid — newly revealed product cards after "Load more" */
-@keyframes gridCardReveal {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
