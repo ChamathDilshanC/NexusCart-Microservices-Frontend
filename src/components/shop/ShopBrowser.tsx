@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -622,6 +622,25 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
   }, [carouselPages.length, carouselHovered]);
   const carouselIndex = carouselPages.length === 0 ? 0 : mod(carouselStep, carouselPages.length);
 
+  // Swipe left/right on touch devices to move to the next/previous batch,
+  // pausing auto-advance for the duration of the gesture the same way
+  // hover does on desktop.
+  const SWIPE_THRESHOLD_PX = 50;
+  const touchStartX = useRef<number | null>(null);
+  const handleCarouselTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    setCarouselHovered(true);
+  };
+  const handleCarouselTouchEnd = (e: React.TouchEvent) => {
+    const startX = touchStartX.current;
+    touchStartX.current = null;
+    setCarouselHovered(false);
+    if (startX === null) return;
+    const delta = e.changedTouches[0].clientX - startX;
+    if (delta <= -SWIPE_THRESHOLD_PX) setCarouselStep((s) => s + 1);
+    else if (delta >= SWIPE_THRESHOLD_PX) setCarouselStep((s) => s - 1);
+  };
+
   // Default (no filter) view on /shop/allitems: the same fetched catalog,
   // split into one section per category so each can show a preview + a
   // "View all" entry point.
@@ -884,9 +903,11 @@ export function ShopBrowser({ alwaysFlat = false }: { alwaysFlat?: boolean }) {
               ) : (
                 <>
                   <div
-                    className="overflow-hidden"
+                    className="overflow-hidden touch-pan-y"
                     onMouseEnter={() => setCarouselHovered(true)}
                     onMouseLeave={() => setCarouselHovered(false)}
+                    onTouchStart={handleCarouselTouchStart}
+                    onTouchEnd={handleCarouselTouchEnd}
                   >
                     {/* items-start keeps each batch sized to its own content — see the
                         matching note on ProductGrid below for why. */}
