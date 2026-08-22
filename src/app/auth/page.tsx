@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 import { KeyRound, Loader2, Lock, Mail, User } from "lucide-react";
@@ -125,6 +125,24 @@ function AuthPageContent() {
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Google's rendered sign-in button is an iframe with a fixed pixel width
+  // (no auto/percentage support), so it doesn't shrink with its container
+  // on its own — measure the wrapper and re-render the button at that width
+  // whenever it changes, clamped to Google's documented 200–400px range.
+  const googleBtnWrapRef = useRef<HTMLDivElement>(null);
+  const [googleBtnWidth, setGoogleBtnWidth] = useState(336);
+
+  useEffect(() => {
+    const el = googleBtnWrapRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setGoogleBtnWidth(Math.round(Math.min(400, Math.max(200, width))));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Deep-link into signup on first mount only, e.g. /auth?view=signup
   useEffect(() => {
@@ -321,14 +339,15 @@ function AuthPageContent() {
 
           {(view === "login" || view === "signup") && (
             <>
-              <div className="flex justify-center [&>div]:w-full">
+              <div ref={googleBtnWrapRef} className="flex justify-center">
                 <GoogleLogin
                   onSuccess={(credentialResponse) => handleGoogleSuccess(credentialResponse.credential)}
                   onError={() => setError("Google sign-in failed. Please try again.")}
                   theme="filled_black"
                   shape="pill"
                   text={view === "signup" ? "signup_with" : "signin_with"}
-                  width="336"
+                  logo_alignment="center"
+                  width={String(googleBtnWidth)}
                 />
               </div>
               <Divider />
