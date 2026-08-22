@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Sparkles,
   Info,
+  Bell,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -29,7 +30,7 @@ import { useCurrency } from "@/components/providers/CurrencyProvider";
 
 /* ---------------------------------- Types ---------------------------------- */
 
-type TabId = "products" | "orders" | "users" | "banners" | "promotions" | "settings";
+type TabId = "products" | "orders" | "users" | "banners" | "promotions" | "notifications" | "settings";
 type IconType = React.ComponentType<{ className?: string }>;
 
 interface Metrics {
@@ -459,6 +460,7 @@ const TABS: { id: TabId; label: string; icon: IconType }[] = [
   { id: "users", label: "Users", icon: Users },
   { id: "banners", label: "Banners", icon: ImagePlus },
   { id: "promotions", label: "Promotions", icon: Percent },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -2006,10 +2008,12 @@ function OrdersSection({
   orders,
   onStatusChange,
   onRefresh,
+  highlightOrderId,
 }: {
   orders: Order[];
   onStatusChange: (order: Order, status: OrderStatus) => Promise<void>;
   onRefresh: () => Promise<void>;
+  highlightOrderId?: string | null;
 }) {
   const [updating, setUpdating] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
@@ -2069,10 +2073,14 @@ function OrdersSection({
             const address = formatAddress(order.shippingAddress);
             const isUpdating = updating.has(order._id);
             const isNew = order.status === "PENDING";
+            const isHighlighted = highlightOrderId === order._id;
             return (
               <div
+                id={`order-${order._id}`}
                 key={order._id}
-                className={`${cardClass} ${isNew ? "border-amber-500/30" : ""}`}
+                className={`${cardClass} ${isNew ? "border-amber-500/30" : ""} ${
+                  isHighlighted ? "ring-2 ring-white/60 transition-shadow" : ""
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                   <div>
@@ -2134,6 +2142,79 @@ function OrdersSection({
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------- Notifications tab ---------------------------------- */
+
+function NotificationsSection({
+  orders,
+  onView,
+}: {
+  orders: Order[];
+  onView: (orderId: string) => void;
+}) {
+  const { formatPrice } = useCurrency();
+  const newOrders = orders
+    .filter((o) => o.status === "PENDING")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm text-gray-500">
+          {newOrders.length} new order{newOrders.length !== 1 ? "s" : ""}
+        </h2>
+        {newOrders.length > 0 && (
+          <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+            <Sparkles className="w-3 h-3" /> Needs attention
+          </span>
+        )}
+      </div>
+
+      {newOrders.length === 0 ? (
+        <EmptyState message="No new orders. You're all caught up." />
+      ) : (
+        <div className="space-y-3">
+          {newOrders.map((order) => {
+            const address = formatAddress(order.shippingAddress);
+            return (
+              <div
+                key={order._id}
+                className={`${cardClass} border-amber-500/30 flex flex-wrap items-center justify-between gap-4`}
+              >
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="shrink-0 w-9 h-9 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                    <Bell className="w-4 h-4 text-amber-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">#{order._id.slice(-8)}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                        New
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 truncate">
+                      {formatDate(order.createdAt)} · {order.items.length} item{order.items.length !== 1 ? "s" : ""}
+                      {address ? ` · ${address}` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="text-sm font-medium text-white">{formatPrice(order.totalAmount)}</span>
+                  <button
+                    onClick={() => onView(order._id)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-black bg-white hover:bg-gray-200 px-4 py-2 rounded-full transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View
+                  </button>
                 </div>
               </div>
             );
@@ -3508,6 +3589,7 @@ export function AdminDashboard() {
   const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("products");
+  const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
 
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -3700,6 +3782,23 @@ export function AdminDashboard() {
     }
   };
 
+  const handleViewOrderNotification = (orderId: string) => {
+    setActiveTab("orders");
+    setHighlightOrderId(orderId);
+  };
+
+  useEffect(() => {
+    if (activeTab !== "orders" || !highlightOrderId) return;
+    const raf = requestAnimationFrame(() => {
+      document.getElementById(`order-${highlightOrderId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = setTimeout(() => setHighlightOrderId(null), 2000);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [activeTab, highlightOrderId]);
+
   /* ---- Banners ---- */
 
   const handleCreateBanner = async (values: BannerFormValues) => {
@@ -3856,6 +3955,8 @@ export function AdminDashboard() {
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
+              const badgeCount =
+                tab.id === "notifications" ? orders.filter((o) => o.status === "PENDING").length : 0;
               return (
                 <button
                   key={tab.id}
@@ -3868,6 +3969,15 @@ export function AdminDashboard() {
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label}
+                  {badgeCount > 0 && (
+                    <span
+                      className={`flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-[10px] font-semibold ${
+                        active ? "bg-amber-500 text-black" : "bg-amber-500/20 text-amber-300"
+                      }`}
+                    >
+                      {badgeCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -3889,7 +3999,12 @@ export function AdminDashboard() {
             />
           )}
           {activeTab === "orders" && (
-            <OrdersSection orders={orders} onStatusChange={handleOrderStatusChange} onRefresh={handleRefreshOrders} />
+            <OrdersSection
+              orders={orders}
+              onStatusChange={handleOrderStatusChange}
+              onRefresh={handleRefreshOrders}
+              highlightOrderId={highlightOrderId}
+            />
           )}
           {activeTab === "users" && <UsersSection users={users} />}
           {activeTab === "banners" && (
@@ -3915,6 +4030,9 @@ export function AdminDashboard() {
               onUpdate={handleUpdatePromotion}
               onDelete={handleDeletePromotion}
             />
+          )}
+          {activeTab === "notifications" && (
+            <NotificationsSection orders={orders} onView={handleViewOrderNotification} />
           )}
           {activeTab === "settings" && (
             <SettingsSection settings={currencySettings} onUpdate={handleUpdateCurrencySettings} />

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext } from "react";
 import { GoeyToaster, goeyToast } from "goey-toast";
+import "goey-toast/styles.css";
 
 interface ToastContextValue {
   success: (message: string) => void;
@@ -21,7 +22,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <GoeyToaster position="bottom-right" theme="dark" />
+      <GoeyToaster position="bottom-right" theme="light" closeButton showProgress />
     </ToastContext.Provider>
   );
 }
