@@ -2439,12 +2439,15 @@ function UsersSection({
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const canManageAdmins = currentUser?.email === SUPER_ADMIN_EMAIL;
+  // This tab is for admin-account management, not a customer directory —
+  // the regular customer base can be large and isn't relevant here.
+  const admins = users.filter((u) => u.role !== "Customer");
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <h2 className="text-sm text-gray-500">
-          {users.length} user{users.length !== 1 ? "s" : ""}
+          {admins.length} administrator{admins.length !== 1 ? "s" : ""}
         </h2>
         <button
           onClick={() => setShowCreate(true)}
@@ -2454,16 +2457,15 @@ function UsersSection({
         </button>
       </div>
 
-      {users.length === 0 ? (
-        <EmptyState message="No users found." />
+      {admins.length === 0 ? (
+        <EmptyState message="No administrators found." />
       ) : (
         <div className="space-y-3">
-          {users.map((user) => {
+          {admins.map((user) => {
             const isSelf = currentUser?.id === user._id;
             const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
-            // Only the super admin can touch another Admin account at all —
-            // everyone else can manage Customer accounts freely.
-            const canManageThisUser = !isSelf && !isSuperAdmin && (user.role !== "Admin" || canManageAdmins);
+            // Only the super admin can touch another Admin account.
+            const canManageThisUser = !isSelf && !isSuperAdmin && canManageAdmins;
             return (
               <div key={user._id} className="flex items-center gap-4 bg-[#111113] border border-white/10 rounded-2xl p-4">
                 <div className="h-10 w-10 shrink-0 rounded-full bg-white/10 grid place-items-center text-sm font-semibold text-white">
