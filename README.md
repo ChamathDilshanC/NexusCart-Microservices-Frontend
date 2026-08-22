@@ -56,7 +56,7 @@ graph TD
     Client[Browser] -->|HTTPS| Next[Next.js App Router]
     Next -->|"/api/* proxy route"| Gateway[API Gateway<br/>external ingress]
 
-    subgraph Azure Container Apps — internal only
+    subgraph AzureApps["Azure Container Apps — internal only"]
         Gateway --> Auth[Auth Service]
         Gateway --> Product[Product Service]
         Gateway --> Admin[Admin Service]
