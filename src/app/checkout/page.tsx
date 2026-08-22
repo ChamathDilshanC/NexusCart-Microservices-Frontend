@@ -48,12 +48,47 @@ interface OrderResponse {
   order: OrderRecord;
 }
 
-interface PaymentResponse {
-  message: string;
-  payment: {
-    status: string;
-    [key: string]: unknown;
-  };
+// The PayHere checkout payload payment-service builds — includes the
+// security hash, so this is POSTed straight to PayHere's hosted payment
+// page via a hidden auto-submitting form rather than through apiFetch.
+interface PayHerePaymentData {
+  sandbox: boolean;
+  merchant_id: string;
+  return_url: string;
+  cancel_url: string;
+  notify_url: string;
+  order_id: string;
+  items: string;
+  amount: string;
+  currency: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  hash: string;
+}
+
+function redirectToPayHere(paymentData: PayHerePaymentData) {
+  const gatewayUrl = paymentData.sandbox
+    ? "https://sandbox.payhere.lk/pay/checkout"
+    : "https://www.payhere.lk/pay/checkout";
+
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = gatewayUrl;
+  for (const [key, value] of Object.entries(paymentData)) {
+    if (key === "sandbox" || value === undefined || value === null) continue;
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = key;
+    input.value = String(value);
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
 }
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: React.ReactNode }[] = [
@@ -222,20 +257,37 @@ export default function CheckoutPage() {
     }
   }, [isAuthInitialized, currentUser, router]);
 
+  // Card / Digital Wallet both go through PayHere's hosted checkout page
+  // (which itself offers card entry plus local wallets) — get the signed
+  // payload from payment-service, then hand the browser off to PayHere.
+  // Cart is intentionally NOT cleared here: the browser is about to leave
+  // the site entirely, and the payment could still fail or be cancelled
+  // once there — clearing happens on the /payment/success return instead.
   const runPayment = async (orderId: string, amount: number) => {
     try {
-      await apiFetch<PaymentResponse>("/payments/process", {
+      const nameParts = (currentUser?.name || "Customer").trim().split(/\s+/);
+      const firstName = nameParts[0] || "Customer";
+      const lastName = nameParts.slice(1).join(" ") || firstName;
+
+      const paymentData = await apiFetch<PayHerePaymentData>("/payments/initiate", {
         method: "POST",
-        body: { orderId, amount, paymentMethod },
+        body: {
+          orderId,
+          amount,
+          customer: {
+            firstName,
+            lastName,
+            email: currentUser?.email,
+            phone,
+            address: street,
+            city,
+          },
+        },
       });
-      setSucceeded(true);
-      clear();
-      toast.success("Order placed and payment completed!");
-      router.push("/profile");
+      redirectToPayHere(paymentData);
     } catch (err) {
       setPaymentFailed(true);
-      toast.error(err instanceof ApiError ? err.message : "Payment failed. Please try again.");
-    } finally {
+      toast.error(err instanceof ApiError ? err.message : "Could not start payment. Please try again.");
       setSubmitting(false);
     }
   };
@@ -281,6 +333,17 @@ export default function CheckoutPage() {
 
       const createdOrder = res.order;
       setOrder(createdOrder);
+
+      if (paymentMethod === "Cash on Delivery") {
+        // No gateway involved — order stays PENDING until paid on delivery.
+        clear();
+        setSucceeded(true);
+        setSubmitting(false);
+        toast.success("Order placed! Pay when your order is delivered.");
+        router.push("/profile");
+        return;
+      }
+
       // Immediately attempt payment as one continuous checkout step.
       await runPayment(createdOrder._id, createdOrder.totalAmount);
     } catch (err) {
@@ -336,11 +399,11 @@ export default function CheckoutPage() {
                 <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 flex flex-col gap-3">
                   <div className="flex items-center gap-2 text-red-300">
                     <AlertCircle className="w-5 h-5 shrink-0" />
-                    <h2 className="text-base font-semibold">Payment failed</h2>
+                    <h2 className="text-base font-semibold">Payment couldn't start</h2>
                   </div>
                   <p className="text-sm text-red-300/80">
-                    Your order was created, but the payment could not be completed. This can happen
-                    occasionally with simulated declines — you can retry the same order below.
+                    Your order was created, but we couldn't reach the payment gateway. Your order is
+                    saved — you can retry the same order below.
                   </p>
                   <button
                     onClick={handleRetryPayment}
