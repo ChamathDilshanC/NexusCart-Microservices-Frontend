@@ -1,13 +1,23 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MapPin, CreditCard, Truck, Wallet, AlertCircle, RefreshCw, Loader2, ImageOff } from "lucide-react";
-import PhoneInput, { type Country, getCountries, getCountryCallingCode } from "react-phone-number-input";
+import {
+  MapPin,
+  CreditCard,
+  Truck,
+  Wallet,
+  AlertCircle,
+  RefreshCw,
+  Loader2,
+  ImageOff,
+  ChevronDown,
+  Search,
+} from "lucide-react";
+import PhoneNumberInput, { type Country, getCountries, getCountryCallingCode } from "react-phone-number-input/input";
 import phoneInputFlags from "react-phone-number-input/flags";
 import phoneInputCountryNames from "react-phone-number-input/locale/en.json";
-import "react-phone-number-input/style.css";
 import { AppHeader } from "@/components/AppHeader";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAppState } from "@/components/providers/AppStateProvider";
@@ -52,15 +62,130 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: React.ReactN
   { value: "Digital Wallet", label: "Digital Wallet", icon: <Wallet className="w-4 h-4" /> },
 ];
 
-// react-phone-number-input's country dropdown only labels each option with
-// the country name by default — no calling code, so there's no way to tell
-// countries with similar names apart, or confirm you picked the right one,
-// until after you've already selected it. Appending "(+code)" to every
-// label fixes that; computed once at module load since it never changes.
+// react-phone-number-input's built-in country dropdown is a native OS
+// <select> — can't be restyled to match the dark theme, no search, and its
+// options only show the country name with no calling code. Below builds a
+// fully custom picker instead, paired with the library's headless number
+// input (react-phone-number-input/input, no built-in select of its own).
+
+const ALL_COUNTRIES = getCountries();
+
+// "(+code)" appended to every label — lets you tell similarly-named
+// countries apart and confirm the calling code before picking one.
 const PHONE_INPUT_LABELS: Record<string, string> = { ...phoneInputCountryNames };
-for (const country of getCountries()) {
+for (const country of ALL_COUNTRIES) {
   const name = (phoneInputCountryNames as Record<string, string>)[country];
   if (name) PHONE_INPUT_LABELS[country] = `${name} (+${getCountryCallingCode(country)})`;
+}
+
+function PhoneCountrySelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value?: Country;
+  onChange: (country: Country) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      setSearch("");
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return ALL_COUNTRIES;
+    return ALL_COUNTRIES.filter((c) => {
+      const label = (phoneInputCountryNames as Record<string, string>)[c] || c;
+      return label.toLowerCase().includes(q) || c.toLowerCase().includes(q) || getCountryCallingCode(c).includes(q);
+    });
+  }, [search]);
+
+  const SelectedFlag = value ? phoneInputFlags[value] : undefined;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Select country code"
+        className="flex items-center gap-1.5 h-full px-3 bg-white/5 border border-white/10 rounded-xl hover:border-white/20 transition-colors disabled:opacity-50"
+      >
+        <span className="w-6 h-4 rounded-sm overflow-hidden shrink-0 flex items-center justify-center bg-white/10">
+          {SelectedFlag && <SelectedFlag title={value ? PHONE_INPUT_LABELS[value] || value : ""} />}
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-2 w-72 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          <div className="relative p-2 border-b border-white/10">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search country or code..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto nexus-country-scroll">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-6 text-center text-xs text-gray-500">No countries match.</div>
+            ) : (
+              filtered.map((c) => {
+                const Flag = phoneInputFlags[c];
+                const label = PHONE_INPUT_LABELS[c] || c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      onChange(c);
+                      setOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-white/5 transition-colors ${
+                      c === value ? "bg-white/10 text-white" : "text-gray-300"
+                    }`}
+                  >
+                    <span className="w-6 h-4 rounded-sm overflow-hidden shrink-0 flex items-center justify-center bg-white/10">
+                      {Flag && <Flag title={label} />}
+                    </span>
+                    <span className="truncate">{label}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* -------------------------------- Page -------------------------------- */
@@ -76,8 +201,9 @@ export default function CheckoutPage() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zipCode, setZipCode] = useState("");
-  const [country, setCountry] = useState("United States");
+  const [country, setCountry] = useState(phoneInputCountryNames.LK || "Sri Lanka");
   const [phone, setPhone] = useState<string | undefined>(undefined);
+  const [phoneCountry, setPhoneCountry] = useState<Country>("LK");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Credit / Debit Card");
 
   const [submitting, setSubmitting] = useState(false);
@@ -255,27 +381,26 @@ export default function CheckoutPage() {
 
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-2">Phone number</label>
-                    <PhoneInput
-                      international
-                      defaultCountry="LK"
-                      flags={phoneInputFlags}
-                      labels={PHONE_INPUT_LABELS}
-                      value={phone}
-                      onChange={setPhone}
-                      onCountryChange={(selectedCountry?: Country) => {
-                        const name = selectedCountry
-                          ? (phoneInputCountryNames as Record<string, string>)[selectedCountry]
-                          : undefined;
-                        if (name) setCountry(name);
-                      }}
-                      disabled={!!order}
-                      placeholder="77 123 4567"
-                      className="nexus-phone-input"
-                      numberInputProps={{
-                        className:
-                          "bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors disabled:opacity-50",
-                      }}
-                    />
+                    <div className="flex gap-2">
+                      <PhoneCountrySelect
+                        value={phoneCountry}
+                        disabled={!!order}
+                        onChange={(selectedCountry) => {
+                          setPhoneCountry(selectedCountry);
+                          const name = (phoneInputCountryNames as Record<string, string>)[selectedCountry];
+                          if (name) setCountry(name);
+                        }}
+                      />
+                      <PhoneNumberInput
+                        international
+                        country={phoneCountry}
+                        value={phone}
+                        onChange={setPhone}
+                        disabled={!!order}
+                        placeholder="77 123 4567"
+                        className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors disabled:opacity-50"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
@@ -430,29 +555,22 @@ export default function CheckoutPage() {
       </div>
 
       <style>{`
-        .nexus-phone-input {
-          display: flex;
-          align-items: stretch;
-          gap: 0.5rem;
+        .nexus-country-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
         }
-        .nexus-phone-input .PhoneInputCountry {
-          background-color: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 0.75rem;
-          padding: 0 0.75rem;
-          margin-right: 0;
-          transition: border-color 0.15s;
+        .nexus-country-scroll::-webkit-scrollbar {
+          width: 6px;
         }
-        .nexus-phone-input .PhoneInputCountry:focus-within {
-          border-color: rgba(255, 255, 255, 0.3);
+        .nexus-country-scroll::-webkit-scrollbar-track {
+          background: transparent;
         }
-        .nexus-phone-input .PhoneInputCountryIcon {
-          width: 1.6em;
-          height: 1.1em;
+        .nexus-country-scroll::-webkit-scrollbar-thumb {
+          background-color: rgba(255, 255, 255, 0.15);
+          border-radius: 9999px;
         }
-        .nexus-phone-input .PhoneInputCountrySelectArrow {
-          color: #9ca3af;
-          opacity: 1;
+        .nexus-country-scroll::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(255, 255, 255, 0.25);
         }
       `}</style>
     </div>
