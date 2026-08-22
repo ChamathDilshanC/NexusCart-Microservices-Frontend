@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Menu, X, ShoppingBag, User as UserIcon, LogOut, LayoutDashboard } from "lucide-react";
+import { Menu, X, ShoppingBag, User as UserIcon, LogOut, LayoutDashboard, Receipt } from "lucide-react";
 import { useAppState } from "./providers/AppStateProvider";
 import { useCart } from "./providers/CartProvider";
 import { clearSession } from "@/lib/api";
@@ -79,6 +79,13 @@ export function AppHeader() {
                 >
                   <UserIcon className="w-4 h-4" />
                   {currentUser.name}
+                </Link>
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white px-3 py-2 rounded-full hover:bg-white/5 transition-colors"
+                >
+                  <Receipt className="w-4 h-4" />
+                  My Orders
                 </Link>
                 {currentUser.role === "Admin" && (
                   <Link
