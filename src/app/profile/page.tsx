@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Mail, MapPin, PackageOpen, ShoppingBag, Receipt, XCircle, Check } from "lucide-react";
+import { Loader2, Mail, MapPin, PackageOpen, ShoppingBag, Receipt, XCircle, Check, ChevronDown } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -128,6 +128,8 @@ export default function ProfilePage() {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const ORDERS_PAGE_SIZE = 3;
+  const [visibleCount, setVisibleCount] = useState(ORDERS_PAGE_SIZE);
 
   // Auth gate — redirect once we know for sure there's no session.
   useEffect(() => {
@@ -259,7 +261,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                {orders.map((order) => (
+                {orders.slice(0, visibleCount).map((order) => (
                   <div key={order._id} className="bg-[#111113] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -320,6 +322,14 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 ))}
+                {visibleCount < orders.length && (
+                  <button
+                    onClick={() => setVisibleCount((c) => c + ORDERS_PAGE_SIZE)}
+                    className="flex items-center justify-center gap-1.5 text-sm text-gray-400 hover:text-white bg-[#111113] border border-white/10 hover:border-white/20 rounded-2xl py-3 transition-colors"
+                  >
+                    Load more <ChevronDown className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             )}
           </section>
