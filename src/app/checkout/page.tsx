@@ -4,6 +4,10 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MapPin, CreditCard, Truck, Wallet, AlertCircle, RefreshCw, Loader2, ImageOff } from "lucide-react";
+import PhoneInput, { type Country } from "react-phone-number-input";
+import phoneInputFlags from "react-phone-number-input/flags";
+import phoneInputCountryNames from "react-phone-number-input/locale/en.json";
+import "react-phone-number-input/style.css";
 import { AppHeader } from "@/components/AppHeader";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAppState } from "@/components/providers/AppStateProvider";
@@ -62,7 +66,7 @@ export default function CheckoutPage() {
   const [state, setState] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [country, setCountry] = useState("United States");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState<string | undefined>(undefined);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Credit / Debit Card");
 
   const [submitting, setSubmitting] = useState(false);
@@ -103,7 +107,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     setFormError("");
 
-    if (!street.trim() || !city.trim() || !state.trim() || !zipCode.trim() || !country.trim() || !phone.trim()) {
+    if (!street.trim() || !city.trim() || !state.trim() || !zipCode.trim() || !country.trim() || !phone) {
       setFormError("Please fill in all shipping fields.");
       return;
     }
@@ -132,7 +136,7 @@ export default function CheckoutPage() {
           shippingAddress,
           customerEmail: currentUser?.email,
           customerName: currentUser?.name,
-          customerPhone: phone.trim(),
+          customerPhone: phone,
           currency: selectedCurrency,
           exchangeRate,
         },
@@ -240,13 +244,25 @@ export default function CheckoutPage() {
 
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-2">Phone number</label>
-                    <input
-                      type="tel"
+                    <PhoneInput
+                      international
+                      defaultCountry="LK"
+                      flags={phoneInputFlags}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={setPhone}
+                      onCountryChange={(selectedCountry?: Country) => {
+                        const name = selectedCountry
+                          ? (phoneInputCountryNames as Record<string, string>)[selectedCountry]
+                          : undefined;
+                        if (name) setCountry(name);
+                      }}
                       disabled={!!order}
-                      placeholder="+1 555 123 4567"
-                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors w-full disabled:opacity-50"
+                      placeholder="77 123 4567"
+                      className="nexus-phone-input"
+                      numberInputProps={{
+                        className:
+                          "bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-colors disabled:opacity-50",
+                      }}
                     />
                   </div>
 
@@ -400,6 +416,33 @@ export default function CheckoutPage() {
           </div>
         )}
       </div>
+
+      <style>{`
+        .nexus-phone-input {
+          display: flex;
+          align-items: stretch;
+          gap: 0.5rem;
+        }
+        .nexus-phone-input .PhoneInputCountry {
+          background-color: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 0.75rem;
+          padding: 0 0.75rem;
+          margin-right: 0;
+          transition: border-color 0.15s;
+        }
+        .nexus-phone-input .PhoneInputCountry:focus-within {
+          border-color: rgba(255, 255, 255, 0.3);
+        }
+        .nexus-phone-input .PhoneInputCountryIcon {
+          width: 1.6em;
+          height: 1.1em;
+        }
+        .nexus-phone-input .PhoneInputCountrySelectArrow {
+          color: #9ca3af;
+          opacity: 1;
+        }
+      `}</style>
     </div>
   );
 }
