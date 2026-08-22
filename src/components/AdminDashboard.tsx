@@ -23,10 +23,22 @@ import {
   Sparkles,
   Info,
   Bell,
+  UserPlus,
+  ShieldCheck,
+  PackagePlus,
+  ArrowUpCircle,
+  ArrowDownCircle,
 } from "lucide-react";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, type SessionUser } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
+import { useAppState } from "@/components/providers/AppStateProvider";
+
+// The only account allowed to grant/revoke Admin access — enforcement is
+// server-side (admin-service rejects anyone else), this just hides the
+// option in the UI for accounts that could never use it anyway. Matches
+// SUPER_ADMIN_EMAIL in backend/.env.
+const SUPER_ADMIN_EMAIL = "chamathdilshan.dev@gmail.com";
 
 /* ---------------------------------- Types ---------------------------------- */
 
@@ -47,12 +59,20 @@ interface AdminUser {
   role: "Customer" | "Admin";
 }
 
+interface StockMovement {
+  type: "IN" | "OUT";
+  quantity: number;
+  note?: string;
+  createdAt: string;
+}
+
 interface Product {
   _id: string;
   name: string;
   description: string;
   price: number;
   stock: number;
+  stockHistory?: StockMovement[];
   category: string;
   imageUrl?: string;
   images?: string[];
@@ -1828,6 +1848,7 @@ function ProductsSection({
   onCreate,
   onUpdate,
   onDelete,
+  onAdjustStock,
   onRenameCategory,
   onDeleteCategory,
   onCreateProductTemplate,
@@ -1840,6 +1861,7 @@ function ProductsSection({
   onCreate: (values: ProductFormValues) => Promise<void>;
   onUpdate: (id: string, values: ProductFormValues) => Promise<void>;
   onDelete: (product: Product) => Promise<void>;
+  onAdjustStock: (product: Product, values: { type: "IN" | "OUT"; quantity: number; note?: string }) => Promise<void>;
   onRenameCategory: (oldName: string, newName: string) => Promise<void>;
   onDeleteCategory: (name: string) => Promise<void>;
   onCreateProductTemplate: (values: ProductTemplateFormValues) => Promise<void>;
@@ -1850,6 +1872,7 @@ function ProductsSection({
   const [editing, setEditing] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
+  const [adjustingStock, setAdjustingStock] = useState<Product | null>(null);
   const { formatPrice } = useCurrency();
 
   const categoryCounts = useMemo(() => {
@@ -1964,6 +1987,13 @@ function ProductsSection({
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <button
+                    onClick={() => setAdjustingStock(product)}
+                    aria-label="Adjust stock"
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <PackagePlus className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => openEdit(product)}
                     aria-label="Edit product"
                     className="text-gray-400 hover:text-white transition-colors"
@@ -1999,7 +2029,126 @@ function ProductsSection({
           />
         </Modal>
       )}
+
+      {adjustingStock && (
+        <StockAdjustmentModal
+          product={adjustingStock}
+          onClose={() => setAdjustingStock(null)}
+          onAdjust={onAdjustStock}
+        />
+      )}
     </div>
+  );
+}
+
+function StockAdjustmentModal({
+  product,
+  onClose,
+  onAdjust,
+}: {
+  product: Product;
+  onClose: () => void;
+  onAdjust: (product: Product, values: { type: "IN" | "OUT"; quantity: number; note?: string }) => Promise<void>;
+}) {
+  const [type, setType] = useState<"IN" | "OUT">("IN");
+  const [quantity, setQuantity] = useState("1");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const qty = Number.parseInt(quantity, 10);
+  const projected = Number.isFinite(qty) && qty > 0 ? product.stock + (type === "IN" ? qty : -qty) : product.stock;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!Number.isFinite(qty) || qty <= 0) return;
+    setSubmitting(true);
+    try {
+      await onAdjust(product, { type, quantity: qty, note: note.trim() || undefined });
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const history = [...(product.stockHistory ?? [])].reverse().slice(0, 5);
+
+  return (
+    <Modal title={`Adjust stock — ${product.name}`} onClose={onClose} widthClass="max-w-md">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500">Current stock</span>
+          <span className="font-medium text-white">{product.stock}</span>
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Direction</label>
+          <SegmentedControl
+            value={type}
+            onChange={setType}
+            options={[
+              { value: "IN" as const, label: "Stock in" },
+              { value: "OUT" as const, label: "Stock out" },
+            ]}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Quantity</label>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            required
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Note (optional)</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. new shipment, damaged units, stock count correction"
+            className={inputClass}
+          />
+        </div>
+
+        <p className={`text-xs ${projected < 0 ? "text-red-400" : "text-gray-500"}`}>
+          {projected < 0 ? "Not enough stock for that adjustment." : `New stock will be ${projected}.`}
+        </p>
+
+        <button
+          type="submit"
+          disabled={submitting || !Number.isFinite(qty) || qty <= 0 || projected < 0}
+          className={primaryButtonClass}
+        >
+          {submitting ? "Saving..." : type === "IN" ? "Add stock" : "Remove stock"}
+        </button>
+
+        {history.length > 0 && (
+          <div className="pt-2 border-t border-white/10">
+            <p className="text-xs text-gray-500 mb-2">Recent adjustments</p>
+            <div className="space-y-1.5">
+              {history.map((entry, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-xs text-gray-400">
+                  {entry.type === "IN" ? (
+                    <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <ArrowDownCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  )}
+                  <span className="text-white">{entry.type === "IN" ? "+" : "-"}{entry.quantity}</span>
+                  {entry.note && <span className="truncate">— {entry.note}</span>}
+                  <span className="ml-auto shrink-0">{formatDate(entry.createdAt)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </form>
+    </Modal>
   );
 }
 
@@ -2275,40 +2424,185 @@ function NotificationsSection({
 
 /* ---------------------------------- Users tab ---------------------------------- */
 
-function UsersSection({ users }: { users: AdminUser[] }) {
+function UsersSection({
+  users,
+  currentUser,
+  onCreate,
+  onUpdateRole,
+  onDelete,
+}: {
+  users: AdminUser[];
+  currentUser: SessionUser | null;
+  onCreate: (values: { name: string; email: string; password: string; role: "Customer" | "Admin" }) => Promise<void>;
+  onUpdateRole: (user: AdminUser, role: "Customer" | "Admin") => Promise<void>;
+  onDelete: (user: AdminUser) => Promise<void>;
+}) {
+  const [showCreate, setShowCreate] = useState(false);
+  const canManageAdmins = currentUser?.email === SUPER_ADMIN_EMAIL;
+
   return (
     <div className="space-y-6">
-      <h2 className="text-sm text-gray-500">
-        {users.length} user{users.length !== 1 ? "s" : ""}
-      </h2>
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm text-gray-500">
+          {users.length} user{users.length !== 1 ? "s" : ""}
+        </h2>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="ml-auto flex items-center gap-1.5 bg-white hover:bg-gray-200 text-black text-sm font-medium px-4 py-2 rounded-full transition-colors"
+        >
+          <UserPlus className="w-3.5 h-3.5" /> Add user
+        </button>
+      </div>
 
       {users.length === 0 ? (
         <EmptyState message="No users found." />
       ) : (
         <div className="space-y-3">
-          {users.map((user) => (
-            <div key={user._id} className="flex items-center gap-4 bg-[#111113] border border-white/10 rounded-2xl p-4">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-white/10 grid place-items-center text-sm font-semibold text-white">
-                {(user.name || "?").charAt(0).toUpperCase()}
+          {users.map((user) => {
+            const isSelf = currentUser?.id === user._id;
+            const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
+            // Only the super admin can touch another Admin account at all —
+            // everyone else can manage Customer accounts freely.
+            const canManageThisUser = !isSelf && !isSuperAdmin && (user.role !== "Admin" || canManageAdmins);
+            return (
+              <div key={user._id} className="flex items-center gap-4 bg-[#111113] border border-white/10 rounded-2xl p-4">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-white/10 grid place-items-center text-sm font-semibold text-white">
+                  {(user.name || "?").charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-white truncate">{user.name}</span>
+                    {isSuperAdmin && (
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-label="Super admin" />
+                    )}
+                    {isSelf && <span className="text-xs text-gray-500 shrink-0">(you)</span>}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">{user.email}</div>
+                </div>
+
+                {canManageThisUser ? (
+                  <select
+                    value={user.role}
+                    onChange={(e) => onUpdateRole(user, e.target.value as "Customer" | "Admin")}
+                    className="shrink-0 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  >
+                    <option value="Customer" className="bg-[#111113] text-white">
+                      Customer
+                    </option>
+                    {canManageAdmins && (
+                      <option value="Admin" className="bg-[#111113] text-white">
+                        Admin
+                      </option>
+                    )}
+                  </select>
+                ) : (
+                  <span
+                    className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      user.role === "Admin"
+                        ? "bg-white/10 text-white border-white/20"
+                        : "bg-white/5 text-gray-400 border-white/10"
+                    }`}
+                  >
+                    {user.role}
+                  </span>
+                )}
+
+                {canManageThisUser && (
+                  <button
+                    onClick={() => onDelete(user)}
+                    aria-label={`Delete ${user.name}`}
+                    className="shrink-0 text-gray-500 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white truncate">{user.name}</div>
-                <div className="text-xs text-gray-500 truncate">{user.email}</div>
-              </div>
-              <span
-                className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full border ${
-                  user.role === "Admin"
-                    ? "bg-white/10 text-white border-white/20"
-                    : "bg-white/5 text-gray-400 border-white/10"
-                }`}
-              >
-                {user.role}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {showCreate && (
+        <CreateUserModal canGrantAdmin={canManageAdmins} onClose={() => setShowCreate(false)} onCreate={onCreate} />
+      )}
     </div>
+  );
+}
+
+function CreateUserModal({
+  canGrantAdmin,
+  onClose,
+  onCreate,
+}: {
+  canGrantAdmin: boolean;
+  onClose: () => void;
+  onCreate: (values: { name: string; email: string; password: string; role: "Customer" | "Admin" }) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"Customer" | "Admin">("Customer");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await onCreate({ name: name.trim(), email: email.trim(), password, role });
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title="Add user" onClose={onClose} widthClass="max-w-md">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Name</label>
+          <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Password</label>
+          <input
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Role</label>
+          <SegmentedControl
+            value={role}
+            onChange={setRole}
+            options={
+              canGrantAdmin
+                ? [
+                    { value: "Customer" as const, label: "Customer" },
+                    { value: "Admin" as const, label: "Admin" },
+                  ]
+                : [{ value: "Customer" as const, label: "Customer" }]
+            }
+          />
+        </div>
+        <button type="submit" disabled={submitting} className={primaryButtonClass}>
+          {submitting ? "Creating..." : "Create user"}
+        </button>
+      </form>
+    </Modal>
   );
 }
 
@@ -3634,6 +3928,7 @@ function SettingsSection({
 export function AdminDashboard() {
   const toast = useToast();
   const { formatPrice } = useCurrency();
+  const { currentUser } = useAppState();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("products");
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
@@ -3748,6 +4043,44 @@ export function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---- Users ---- */
+
+  const handleCreateUser = async (values: {
+    name: string;
+    email: string;
+    password: string;
+    role: "Customer" | "Admin";
+  }) => {
+    try {
+      await apiFetch("/admin/users", { method: "POST", body: values });
+      toast.success("User created");
+      await Promise.all([fetchUsers(), fetchMetrics()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to create user"));
+    }
+  };
+
+  const handleUpdateUserRole = async (user: AdminUser, role: "Customer" | "Admin") => {
+    try {
+      await apiFetch(`/admin/users/${user._id}/role`, { method: "PATCH", body: { role } });
+      toast.success(`${user.name} is now ${role}`);
+      await fetchUsers();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to update role"));
+    }
+  };
+
+  const handleDeleteUser = async (user: AdminUser) => {
+    if (!window.confirm(`Delete "${user.name}" (${user.email})? This cannot be undone.`)) return;
+    try {
+      await apiFetch(`/admin/users/${user._id}`, { method: "DELETE" });
+      toast.success("User deleted");
+      await Promise.all([fetchUsers(), fetchMetrics()]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to delete user"));
+    }
+  };
+
   /* ---- Products ---- */
 
   const handleCreateProduct = async (values: ProductFormValues) => {
@@ -3778,6 +4111,19 @@ export function AdminDashboard() {
       await Promise.all([fetchProducts(), fetchMetrics()]);
     } catch (err) {
       toast.error(errorMessage(err, "Failed to delete product"));
+    }
+  };
+
+  const handleAdjustStock = async (
+    product: Product,
+    values: { type: "IN" | "OUT"; quantity: number; note?: string }
+  ) => {
+    try {
+      await apiFetch(`/admin/products/${product._id}/stock`, { method: "PATCH", body: values });
+      toast.success(values.type === "IN" ? "Stock added" : "Stock removed");
+      await fetchProducts();
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to adjust stock"));
     }
   };
 
@@ -4067,6 +4413,7 @@ export function AdminDashboard() {
               onCreate={handleCreateProduct}
               onUpdate={handleUpdateProduct}
               onDelete={handleDeleteProduct}
+              onAdjustStock={handleAdjustStock}
               onRenameCategory={handleRenameCategory}
               onDeleteCategory={handleDeleteCategory}
               onCreateProductTemplate={handleCreateProductTemplate}
@@ -4082,7 +4429,15 @@ export function AdminDashboard() {
               highlightOrderId={highlightOrderId}
             />
           )}
-          {activeTab === "users" && <UsersSection users={users} />}
+          {activeTab === "users" && (
+            <UsersSection
+              users={users}
+              currentUser={currentUser}
+              onCreate={handleCreateUser}
+              onUpdateRole={handleUpdateUserRole}
+              onDelete={handleDeleteUser}
+            />
+          )}
           {activeTab === "banners" && (
             <BannersSection
               banners={banners}
