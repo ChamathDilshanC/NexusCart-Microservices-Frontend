@@ -7,6 +7,7 @@ import { Loader2, Mail, MapPin, PackageOpen, ShoppingBag, Receipt, XCircle, Chec
 import { AppHeader } from "@/components/AppHeader";
 import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { ApiError, apiFetch, clearSession } from "@/lib/api";
 
 type OrderStatus = "PENDING" | "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
@@ -117,16 +118,13 @@ function formatAddress(addr: ShippingAddress) {
   return `${addr.street}, ${addr.city}, ${addr.state} ${addr.zipCode}, ${addr.country}`;
 }
 
-function formatCurrency(amount: number) {
-  return `$${amount.toFixed(2)}`;
-}
-
 /* ---------------------------------- Page ---------------------------------- */
 
 export default function ProfilePage() {
   const router = useRouter();
   const toast = useToast();
   const { currentUser, setCurrentUser, isAuthInitialized } = useAppState();
+  const { formatPrice } = useCurrency();
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -274,7 +272,7 @@ export default function ProfilePage() {
                         >
                           {order.status}
                         </span>
-                        <span className="text-sm font-semibold text-white">{formatCurrency(order.totalAmount)}</span>
+                        <span className="text-sm font-semibold text-white">{formatPrice(order.totalAmount)}</span>
                       </div>
                     </div>
 

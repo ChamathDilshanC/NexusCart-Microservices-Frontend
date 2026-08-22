@@ -7,6 +7,7 @@ import { Loader2, Printer, ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAppState } from "@/components/providers/AppStateProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { apiFetch, ApiError } from "@/lib/api";
 
 type OrderStatus = "PENDING" | "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
@@ -38,10 +39,6 @@ interface Order {
   createdAt: string;
 }
 
-function formatCurrency(amount: number) {
-  return `$${amount.toFixed(2)}`;
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
@@ -59,6 +56,7 @@ export default function InvoicePage() {
   const router = useRouter();
   const toast = useToast();
   const { currentUser, isAuthInitialized } = useAppState();
+  const { formatPrice } = useCurrency();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -186,10 +184,23 @@ export default function InvoicePage() {
             <tbody>
               {order.items.map((item, idx) => (
                 <tr key={`${item.productId}-${idx}`} className="border-b border-gray-100">
-                  <td className="py-3">{item.name}</td>
+                  <td className="py-3">
+                    <div className="flex items-center gap-3">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0" />
+                      )}
+                      <span>{item.name}</span>
+                    </div>
+                  </td>
                   <td className="py-3 text-center text-gray-600">{item.quantity}</td>
-                  <td className="py-3 text-right text-gray-600">{formatCurrency(item.price)}</td>
-                  <td className="py-3 text-right font-medium">{formatCurrency(item.price * item.quantity)}</td>
+                  <td className="py-3 text-right text-gray-600">{formatPrice(item.price)}</td>
+                  <td className="py-3 text-right font-medium">{formatPrice(item.price * item.quantity)}</td>
                 </tr>
               ))}
             </tbody>
@@ -198,7 +209,7 @@ export default function InvoicePage() {
           <div className="flex justify-end pt-6">
             <div className="w-full max-w-xs flex items-center justify-between pt-4 border-t-2 border-gray-900">
               <span className="text-sm font-semibold">Total</span>
-              <span className="text-lg font-semibold">{formatCurrency(order.totalAmount)}</span>
+              <span className="text-lg font-semibold">{formatPrice(order.totalAmount)}</span>
             </div>
           </div>
 
