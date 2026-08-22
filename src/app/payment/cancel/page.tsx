@@ -1,13 +1,32 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { XCircle, Loader2 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAppState } from "@/components/providers/AppStateProvider";
 
+function CenteredLoader() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <AppHeader />
+      <div className="max-w-7xl mx-auto px-6 py-24 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+      </div>
+    </div>
+  );
+}
+
 export default function PaymentCancelPage() {
+  return (
+    <Suspense fallback={<CenteredLoader />}>
+      <PaymentCancelContent />
+    </Suspense>
+  );
+}
+
+function PaymentCancelContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser, isAuthInitialized } = useAppState();

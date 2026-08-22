@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Loader2, Receipt } from "lucide-react";
@@ -23,7 +23,26 @@ interface Order {
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLLS = 6;
 
+function CenteredLoader() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <AppHeader />
+      <div className="max-w-7xl mx-auto px-6 py-24 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+      </div>
+    </div>
+  );
+}
+
 export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<CenteredLoader />}>
+      <PaymentSuccessContent />
+    </Suspense>
+  );
+}
+
+function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser, isAuthInitialized } = useAppState();
