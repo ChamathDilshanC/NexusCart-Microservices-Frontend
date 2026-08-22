@@ -1388,26 +1388,24 @@ function ProductTemplateForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Columns</label>
-              <SegmentedControl
+              <ClampedNumberInput
+                min={2}
+                max={8}
+                fallback={3}
                 value={options.grid.columns}
-                onChange={(v) => updateGrid({ columns: v })}
-                options={[
-                  { value: 2, label: "2" },
-                  { value: 3, label: "3" },
-                  { value: 4, label: "4" },
-                ]}
+                onCommit={(columns) => updateGrid({ columns })}
+                className={inputClass}
               />
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Rows</label>
-              <SegmentedControl
+              <ClampedNumberInput
+                min={1}
+                max={10}
+                fallback={2}
                 value={options.grid.rows}
-                onChange={(v) => updateGrid({ rows: v })}
-                options={[
-                  { value: 1, label: "1" },
-                  { value: 2, label: "2" },
-                  { value: 3, label: "3" },
-                ]}
+                onCommit={(rows) => updateGrid({ rows })}
+                className={inputClass}
               />
             </div>
           </div>
@@ -1545,13 +1543,13 @@ function ProductTemplateForm({
           </p>
           <div className="max-w-xs">
             <label className="text-xs text-gray-500 mb-1.5 block">Featured tiles</label>
-            <SegmentedControl
+            <ClampedNumberInput
+              min={1}
+              max={6}
+              fallback={1}
               value={options.bento.featuredCount}
-              onChange={(v) => updateBento({ featuredCount: v })}
-              options={[
-                { value: 1, label: "1 large" },
-                { value: 2, label: "2 large" },
-              ]}
+              onCommit={(featuredCount) => updateBento({ featuredCount })}
+              className={inputClass}
             />
           </div>
         </div>
@@ -2692,14 +2690,13 @@ function BannerTemplateForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block">Columns</label>
-              <SegmentedControl
+              <ClampedNumberInput
+                min={2}
+                max={8}
+                fallback={3}
                 value={options.grid.columns}
-                onChange={(v) => updateGrid({ columns: v })}
-                options={[
-                  { value: 2, label: "2" },
-                  { value: 3, label: "3" },
-                  { value: 4, label: "4" },
-                ]}
+                onCommit={(columns) => updateGrid({ columns })}
+                className={inputClass}
               />
             </div>
             <div>
@@ -2828,13 +2825,13 @@ function BannerTemplateForm({
           </p>
           <div className="max-w-xs">
             <label className="text-xs text-gray-500 mb-1.5 block">Featured tiles</label>
-            <SegmentedControl
+            <ClampedNumberInput
+              min={1}
+              max={6}
+              fallback={1}
               value={options.bento.featuredCount}
-              onChange={(v) => updateBento({ featuredCount: v })}
-              options={[
-                { value: 1, label: "1 large" },
-                { value: 2, label: "2 large" },
-              ]}
+              onCommit={(featuredCount) => updateBento({ featuredCount })}
+              className={inputClass}
             />
           </div>
           <label className="flex items-center gap-3 cursor-pointer select-none">
