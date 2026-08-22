@@ -22,7 +22,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <GoeyToaster position="bottom-right" theme="light" closeButton showProgress />
+      {/* offset clears the sticky header (~72px tall) with room to spare —
+          goey-toast's offset is a single value applied to all sides, so
+          this also insets toasts 96px from the right edge, not just the top. */}
+      <GoeyToaster position="top-right" offset="96px" theme="light" closeButton showProgress />
     </ToastContext.Provider>
   );
 }

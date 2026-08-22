@@ -444,6 +444,8 @@ const secondaryButtonClass =
   "bg-[#1F1F22] hover:bg-[#2A2A2D] text-white text-sm font-medium px-6 py-3 rounded-full border border-white/5 transition-colors";
 const cardClass = "bg-[#111113] border border-white/10 rounded-2xl p-6";
 
+const VIEWED_ORDER_NOTIFICATIONS_KEY = "nexus_admin_viewed_order_notifications";
+
 const STATUS_OPTIONS: OrderStatus[] = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"];
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
@@ -2156,14 +2158,16 @@ function OrdersSection({
 
 function NotificationsSection({
   orders,
+  viewedOrderIds,
   onView,
 }: {
   orders: Order[];
+  viewedOrderIds: Set<string>;
   onView: (orderId: string) => void;
 }) {
   const { formatPrice } = useCurrency();
   const newOrders = orders
-    .filter((o) => o.status === "PENDING")
+    .filter((o) => o.status === "PENDING" && !viewedOrderIds.has(o._id))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
@@ -3590,6 +3594,32 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("products");
   const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+  const [viewedOrderIds, setViewedOrderIds] = useState<Set<string>>(new Set());
+
+  // Load which order notifications have already been viewed, so they stay
+  // dismissed from the Notifications tab across reloads. Loaded in an
+  // effect (not a useState initializer) to avoid an SSR/hydration mismatch.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(VIEWED_ORDER_NOTIFICATIONS_KEY);
+      if (raw) setViewedOrderIds(new Set(JSON.parse(raw)));
+    } catch {
+      // Ignore malformed or inaccessible storage — worst case, everything shows as new again.
+    }
+  }, []);
+
+  const markOrderNotificationViewed = (orderId: string) => {
+    setViewedOrderIds((prev) => {
+      if (prev.has(orderId)) return prev;
+      const next = new Set(prev).add(orderId);
+      try {
+        localStorage.setItem(VIEWED_ORDER_NOTIFICATIONS_KEY, JSON.stringify([...next]));
+      } catch {
+        // Ignore quota/private-mode errors — dismissal just won't persist.
+      }
+      return next;
+    });
+  };
 
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -3783,6 +3813,7 @@ export function AdminDashboard() {
   };
 
   const handleViewOrderNotification = (orderId: string) => {
+    markOrderNotificationViewed(orderId);
     setActiveTab("orders");
     setHighlightOrderId(orderId);
   };
@@ -3956,7 +3987,9 @@ export function AdminDashboard() {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
               const badgeCount =
-                tab.id === "notifications" ? orders.filter((o) => o.status === "PENDING").length : 0;
+                tab.id === "notifications"
+                  ? orders.filter((o) => o.status === "PENDING" && !viewedOrderIds.has(o._id)).length
+                  : 0;
               return (
                 <button
                   key={tab.id}
@@ -4032,7 +4065,11 @@ export function AdminDashboard() {
             />
           )}
           {activeTab === "notifications" && (
-            <NotificationsSection orders={orders} onView={handleViewOrderNotification} />
+            <NotificationsSection
+              orders={orders}
+              viewedOrderIds={viewedOrderIds}
+              onView={handleViewOrderNotification}
+            />
           )}
           {activeTab === "settings" && (
             <SettingsSection settings={currencySettings} onUpdate={handleUpdateCurrencySettings} />

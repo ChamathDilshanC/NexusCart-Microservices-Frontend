@@ -155,7 +155,7 @@ function AuthPageContent() {
   // Already signed in — bounce away from the auth page entirely.
   useEffect(() => {
     if (isAuthInitialized && currentUser) {
-      router.replace("/");
+      router.replace(currentUser.role === "Admin" ? "/admin" : "/shop");
     }
   }, [isAuthInitialized, currentUser, router]);
 
@@ -171,7 +171,7 @@ function AuthPageContent() {
   function completeAuth(user: SessionUser, token: string) {
     setSession(user, token);
     setCurrentUser(user);
-    router.replace(user.role === "Admin" ? "/admin" : "/");
+    router.replace(user.role === "Admin" ? "/admin" : "/shop");
   }
 
   function messageFromError(err: unknown, fallback: string) {
